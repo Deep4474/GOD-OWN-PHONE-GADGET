@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Order Review</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #f3f4f6; }
+        .admin-orders-container { max-width: 800px; margin: 2rem auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); padding: 2rem; }
+        .admin-orders-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .admin-orders-list { margin-top: 1rem; }
+        .admin-order { border: 1px solid #e5e7eb; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; background: #f9fafb; }
+        .admin-order .order-actions { margin-top: 0.5rem; }
+        .admin-order .order-actions button { margin-right: 0.5rem; }
+        .admin-order .order-status { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="admin-orders-container">
+        <div class="admin-orders-header">
+            <h2>Admin Order Review</h2>
+            <button id="refreshOrders" class="btn btn-primary">Refresh</button>
+        </div>
+        <div id="adminOrdersList" class="admin-orders-list">Loading orders...</div>
+    </div>
+    <script src="admin-orders.js"></script>
+</body>
+</html> 
