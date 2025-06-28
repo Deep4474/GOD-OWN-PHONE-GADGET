@@ -1,190 +1,494 @@
-const jwt = require('jsonwebtoken');
+const express = require('express');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { protect, authorize } = require('../middleware/auth');
+const ErrorResponse = require('../utils/errorResponse');
+const sendEmail = require('../utils/sendEmail');
+const crypto = require('crypto');
 
-// Protect routes - require authentication
-exports.protect = async (req, res, next) => {
-    let token;
+const router = express.Router();
 
-    // Check if token exists in headers
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
-    }
-
-    // Check if token exists in cookies
-    if (!token && req.cookies && req.cookies.token) {
-        token = req.cookies.token;
-    }
-
-    // Check if token exists
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: 'Not authorized to access this route'
-        });
-    }
-
+// @desc    Register user
+// @route   POST /api/auth/register
+// @access  Public
+router.post('/register', [
+    body('firstName')
+        .trim()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('First name must be between 2 and 50 characters'),
+    body('lastName')
+        .trim()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Last name must be between 2 and 50 characters'),
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Please provide a valid email'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password must be at least 6 characters long'),
+    body('phone')
+        .optional()
+        .matches(/^[\+]?[1-9][\d]{0,15}$/)
+        .withMessage('Please provide a valid phone number')
+], async (req, res, next) => {
     try {
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                errors: errors.array()
+            });
+        }
 
-        // Get user from token
-        req.user = await User.findById(decoded.id).select('-password');
+        const { firstName, lastName, email, password, phone } = req.body;
 
-        if (!req.user) {
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists with this email'
+            });
+        }
+
+        // Create user
+        const user = await User.create({
+            firstName,
+            lastName,
+            email,
+            password,
+            phone
+        });
+
+        // Generate email verification token
+        const verificationToken = user.getEmailVerificationToken();
+        await user.save();
+
+        // Send verification email
+        const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
+        const message = `
+            <h1>Welcome to GOD OWN PHONE GADGET!</h1>
+            <p>Please click the link below to verify your email address:</p>
+            <a href="${verificationUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
+                Verify Email
+            </a>
+            <p>If you didn't create an account, please ignore this email.</p>
+        `;
+
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: 'Email Verification - GOD OWN PHONE GADGET',
+                message
+            });
+
+            res.status(201).json({
+                success: true,
+                message: 'Registration successful. Please check your email to verify your account.',
+                user: {
+                    id: user._id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email,
+                    role: user.role
+                }
+            });
+        } catch (error) {
+            user.emailVerificationToken = undefined;
+            user.emailVerificationExpire = undefined;
+            await user.save();
+
+            return res.status(500).json({
+                success: false,
+                message: 'Email could not be sent'
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+router.post('/login', [
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Please provide a valid email'),
+    body('password')
+        .notEmpty()
+        .withMessage('Password is required')
+], async (req, res, next) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                errors: errors.array()
+            });
+        }
+
+        const { email, password } = req.body;
+
+        // Check if user exists
+        const user = await User.findOne({ email }).select('+password');
+        if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'User not found'
+                message: 'Invalid credentials'
+            });
+        }
+
+        // Check if password matches
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
             });
         }
 
         // Check if user is active
-        if (!req.user.isActive) {
+        if (!user.isActive) {
             return res.status(401).json({
                 success: false,
                 message: 'Account is deactivated'
             });
         }
 
-        next();
+        // Update last login
+        user.lastLogin = new Date();
+        await user.save();
+
+        // Generate token
+        const token = user.getJwtToken();
+
+        // Set cookie
+        const options = {
+            expires: new Date(Date.now() + process.env.JWT_EXPIRE * 24 * 60 * 60 * 1000),
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production'
+        };
+
+        res.status(200)
+            .cookie('token', token, options)
+            .json({
+                success: true,
+                token,
+                user: {
+                    id: user._id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email,
+                    role: user.role,
+                    isEmailVerified: user.isEmailVerified
+                }
+            });
     } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: 'Not authorized to access this route'
+        next(error);
+    }
+});
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+router.post('/logout', protect, async (req, res, next) => {
+    try {
+        res.cookie('token', 'none', {
+            expires: new Date(Date.now() + 10 * 1000),
+            httpOnly: true
         });
-    }
-};
 
-// Grant access to specific roles
-exports.authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({
+        res.status(200).json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @desc    Get current user
+// @route   GET /api/auth/me
+// @access  Private
+router.get('/me', protect, async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user.id);
+        res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @desc    Update user profile
+// @route   PUT /api/auth/update-profile
+// @access  Private
+router.put('/update-profile', protect, [
+    body('firstName')
+        .optional()
+        .trim()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('First name must be between 2 and 50 characters'),
+    body('lastName')
+        .optional()
+        .trim()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Last name must be between 2 and 50 characters'),
+    body('phone')
+        .optional()
+        .matches(/^[\+]?[1-9][\d]{0,15}$/)
+        .withMessage('Please provide a valid phone number')
+], async (req, res, next) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
                 success: false,
-                message: 'Not authorized to access this route'
+                errors: errors.array()
             });
         }
 
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
+        const fieldsToUpdate = {
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            phone: req.body.phone
+        };
+
+        // Remove undefined fields
+        Object.keys(fieldsToUpdate).forEach(key => 
+            fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
+        );
+
+        const user = await User.findByIdAndUpdate(
+            req.user.id,
+            fieldsToUpdate,
+            {
+                new: true,
+                runValidators: true
+            }
+        );
+
+        res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put('/change-password', protect, [
+    body('currentPassword')
+        .notEmpty()
+        .withMessage('Current password is required'),
+    body('newPassword')
+        .isLength({ min: 6 })
+        .withMessage('New password must be at least 6 characters long')
+], async (req, res, next) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
                 success: false,
-                message: `User role ${req.user.role} is not authorized to access this route`
+                errors: errors.array()
             });
         }
 
-        next();
-    };
-};
+        const { currentPassword, newPassword } = req.body;
 
-// Optional authentication - doesn't require token but adds user if available
-exports.optionalAuth = async (req, res, next) => {
-    let token;
+        const user = await User.findById(req.user.id).select('+password');
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
+        // Check current password
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password is incorrect'
+            });
+        }
+
+        // Update password
+        user.password = newPassword;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password updated successfully'
+        });
+    } catch (error) {
+        next(error);
     }
+});
 
-    if (!token && req.cookies && req.cookies.token) {
-        token = req.cookies.token;
-    }
+// @desc    Forgot password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+router.post('/forgot-password', [
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Please provide a valid email')
+], async (req, res, next) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                errors: errors.array()
+            });
+        }
 
-    if (token) {
+        const user = await User.findOne({ email: req.body.email });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Generate reset token
+        const resetToken = user.getResetPasswordToken();
+        await user.save();
+
+        // Create reset url
+        const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+        const message = `
+            <h1>Password Reset Request</h1>
+            <p>You requested a password reset. Please click the link below to reset your password:</p>
+            <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
+                Reset Password
+            </a>
+            <p>If you didn't request this, please ignore this email.</p>
+            <p>This link will expire in 10 minutes.</p>
+        `;
+
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = await User.findById(decoded.id).select('-password');
+            await sendEmail({
+                email: user.email,
+                subject: 'Password Reset - GOD OWN PHONE GADGET',
+                message
+            });
+
+            res.status(200).json({
+                success: true,
+                message: 'Password reset email sent'
+            });
         } catch (error) {
-            // Token is invalid, but we don't throw error for optional auth
-            req.user = null;
-        }
-    }
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save();
 
-    next();
-};
-
-// Check if user is admin
-exports.isAdmin = (req, res, next) => {
-    if (!req.user || req.user.role !== 'admin') {
-        return res.status(403).json({
-            success: false,
-            message: 'Admin access required'
-        });
-    }
-    next();
-};
-
-// Check if user owns the resource or is admin
-exports.isOwnerOrAdmin = (resourceUserId) => {
-    return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({
+            return res.status(500).json({
                 success: false,
-                message: 'Authentication required'
+                message: 'Email could not be sent'
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @desc    Reset password
+// @route   PUT /api/auth/reset-password/:resetToken
+// @access  Public
+router.put('/reset-password/:resetToken', [
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password must be at least 6 characters long')
+], async (req, res, next) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                errors: errors.array()
             });
         }
 
-        // Allow if user is admin or owns the resource
-        if (req.user.role === 'admin' || req.user._id.toString() === resourceUserId.toString()) {
-            return next();
+        // Get hashed token
+        const resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(req.params.resetToken)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken,
+            resetPasswordExpire: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired reset token'
+            });
         }
 
-        return res.status(403).json({
-            success: false,
-            message: 'Not authorized to access this resource'
+        // Set new password
+        user.password = req.body.password;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset successful'
         });
-    };
-};
-
-// Rate limiting for authentication attempts
-exports.authRateLimit = (req, res, next) => {
-    const key = `auth_${req.ip}`;
-    const limit = 5; // 5 attempts
-    const windowMs = 15 * 60 * 1000; // 15 minutes
-
-    // This is a simple in-memory rate limiting
-    // In production, use Redis or a proper rate limiting library
-    if (!req.app.locals.authAttempts) {
-        req.app.locals.authAttempts = new Map();
+    } catch (error) {
+        next(error);
     }
+});
 
-    const attempts = req.app.locals.authAttempts.get(key) || { count: 0, resetTime: Date.now() + windowMs };
+// @desc    Verify email
+// @route   GET /api/auth/verify-email/:token
+// @access  Public
+router.get('/verify-email/:token', async (req, res, next) => {
+    try {
+        // Get hashed token
+        const emailVerificationToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
 
-    if (Date.now() > attempts.resetTime) {
-        attempts.count = 0;
-        attempts.resetTime = Date.now() + windowMs;
-    }
-
-    attempts.count++;
-
-    if (attempts.count > limit) {
-        return res.status(429).json({
-            success: false,
-            message: 'Too many authentication attempts. Please try again later.'
+        const user = await User.findOne({
+            emailVerificationToken,
+            emailVerificationExpire: { $gt: Date.now() }
         });
-    }
 
-    req.app.locals.authAttempts.set(key, attempts);
-    next();
-};
-
-// Validate JWT token without requiring user to exist
-exports.validateToken = (req, res, next) => {
-    let token;
-
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
-    }
-
-    if (!token && req.cookies && req.cookies.token) {
-        token = req.cookies.token;
-    }
-
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.tokenData = decoded;
-        } catch (error) {
-            req.tokenData = null;
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired verification token'
+            });
         }
-    }
 
-    next();
-}; 
+        // Verify email
+        user.isEmailVerified = true;
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpire = undefined;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Email verified successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+module.exports = router; 
