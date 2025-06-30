@@ -1,833 +1,212 @@
-/* === Global Styles === */
-:root {
-  --primary-color: #3b82f6;
-  --primary-hover: #2563eb;
-  --secondary-color: #1f2937;
-  --text-color: #333;
-  --bg-color: #f9fafb;
-  --card-bg: #ffffff;
-  --border-color: #e5e7eb;
-  --success-color: #10b981;
-  --error-color: #ef4444;
-  --font-family: 'Inter', sans-serif;
+
+/* Base Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  font-family: var(--font-family);
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  margin: 0;
-  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #f4f6f9;
+  color: #333;
   line-height: 1.6;
+  padding: 0;
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-h1, h2, h3, h4 {
-  color: var(--secondary-color);
-  margin-top: 0;
-}
-
-/* === Header === */
+/* Header */
 header {
-  background-color: var(--card-bg);
+  background: #0077ff;
+  color: white;
   padding: 1rem 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
 }
 
 header h1 {
-  font-size: 1.5rem;
-  color: var(--primary-color);
-  margin: 0;
-}
-
-#user-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-#user-info p {
-  margin: 0;
-  font-weight: bold;
-}
-
-#header-actions {
-  display: flex;
-  gap: 1rem;
+  font-size: 22px;
 }
 
 #header-actions button {
+  background: white;
+  color: #0077ff;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  padding: 8px 14px;
+  margin-left: 10px;
+  border-radius: 5px;
   cursor: pointer;
   font-weight: bold;
-  background-color: #e5e7eb;
-  color: var(--secondary-color);
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 0.9rem;
 }
 
 #header-actions button:hover {
-  background-color: #d1d5db;
-  transform: translateY(-2px);
+  background: #f0f0f0;
 }
 
-/* === Buttons === */
-.btn-primary, .btn-secondary, #logout-btn, #orders-btn {
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 0.9rem;
+#user-info {
+  text-align: right;
+  font-size: 14px;
+  margin-top: 0.3rem;
 }
 
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  transform: translateY(-2px);
-}
-
-.btn-secondary, #logout-btn, #orders-btn {
-  background-color: #e5e7eb;
-  color: var(--secondary-color);
-}
-
-.btn-secondary:hover, #logout-btn:hover, #orders-btn:hover {
-  background-color: #d1d5db;
-}
-
-/* === Forms & Sections === */
+/* Section Styling */
 .section {
-  background-color: var(--card-bg);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  max-width: 500px;
+  max-width: 600px;
   margin: 2rem auto;
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
+/* Form Elements */
 .form-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.2rem;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   font-weight: 600;
 }
 
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-textarea,
-select {
+input, select, textarea {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 1rem;
-  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+textarea {
+  min-height: 80px;
 }
 
 input:focus, select:focus, textarea:focus {
+  border-color: #0077ff;
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-/* === Product Grid === */
-#products-section {
-  max-width: 100%;
+/* Buttons */
+.btn-primary, .btn-secondary {
+  background-color: #0077ff;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s ease;
 }
 
+.btn-secondary {
+  background: #555;
+}
+
+.btn-primary:hover {
+  background-color: #005bd1;
+}
+
+.btn-secondary:hover {
+  background: #444;
+}
+
+/* Links */
+a {
+  color: #0077ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Product Grid */
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1.5rem;
+  margin-top: 1.5rem;
 }
 
 .product-card {
-  background-color: var(--card-bg);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
+  transition: transform 0.2s ease;
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 12px rgba(0,0,0,0.1);
+  transform: translateY(-4px);
 }
 
 .product-card img {
   width: 100%;
-  height: 200px;
+  height: 180px;
   object-fit: cover;
 }
 
-.product-card h4 {
-  font-size: 1.1rem;
-  margin: 1rem 1rem 0.5rem;
+.product-card-body {
+  padding: 1rem;
 }
 
-.product-card .description {
-  font-size: 0.9rem;
-  margin: 0 1rem 1rem;
-  flex-grow: 1;
-  color: #6b7280;
+.product-card-body h3 {
+  font-size: 16px;
+  margin-bottom: 5px;
 }
 
-.product-card .price {
-  font-size: 1.25rem;
-  font-weight: bold;
-  color: var(--primary-color);
-  margin: 0 1rem 1rem;
+.product-card-body p {
+  font-size: 14px;
+  margin: 0.3rem 0;
 }
 
-.product-card .category {
-    font-size: 0.8rem;
-    color: #9ca3af;
-    margin: 0 1rem 0.5rem;
-    text-transform: uppercase;
-}
-
-.product-card button {
-  width: calc(100% - 2rem);
-  margin: 0 1rem 1rem;
-}
-
-/* === My Orders Section === */
-#orders-list {
+/* Search Filter */
+.search-filter {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   gap: 1rem;
+  margin-top: 1rem;
 }
 
-.order-card {
-  background-color: var(--bg-color);
-  padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+.search-filter input,
+.search-filter select {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  width: 100%;
+  max-width: 300px;
 }
 
-.order-card h4 {
-  margin-bottom: 0.5rem;
+/* Order Summary */
+.order-summary {
+  margin-top: 1rem;
+  background: #f9f9f9;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #ddd;
 }
 
-.order-card p {
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
-}
-
-.order-card .status {
-  font-weight: bold;
-  text-transform: capitalize;
-}
-
-/* === Utility === */
-.hidden {
-  display: none !important;
-}
-
-.spinner {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid var(--primary-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* === Reset === */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.6;
-    color: #333;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-  }
-  
-  /* === Header === */
+/* Responsive */
+@media screen and (max-width: 600px) {
   header {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  
-  header h1 {
-    color: #2c3e50;
-    font-size: 2rem;
-    font-weight: bold;
-  }
-  
-  #user-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-  
-  #user-info p {
-    margin: 0;
-    color: #2c3e50;
-    font-weight: 500;
-  }
-  
-  main {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 2rem;
-  }
-  
-  /* === Sections === */
-  .section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
-  }
-  
-  .section h2 {
-    color: #2c3e50;
-    margin-bottom: 1.5rem;
-    text-align: center;
-    font-size: 2rem;
-  }
-  
-  /* === Forms === */
-  .form-group {
-    margin-bottom: 1rem;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: #2c3e50;
-    font-weight: 500;
-  }
-  
-  input, select, textarea {
-    width: 100%;
-    padding: 12px 15px;
-    border: 2px solid #e1e8ed;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: white;
-  }
-  
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-  
-  textarea {
-    resize: vertical;
-    min-height: 80px;
-  }
-  
-  /* === Search and Filter === */
-  .search-filter {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-  }
-  
-  .search-filter input,
-  .search-filter select {
-    flex: 1;
-    min-width: 200px;
-  }
-  
-  /* === Buy Section === */
-  .product-summary {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    border-left: 4px solid #667eea;
-  }
-  
-  .product-summary p {
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
-  }
-  
-  .order-summary {
-    background: #e8f5e8;
-    padding: 1.5rem;
-    border-radius: 8px;
-    margin: 1.5rem 0;
-    border-left: 4px solid #27ae60;
-  }
-  
-  .order-summary h3 {
-    color: #27ae60;
-    margin-bottom: 1rem;
-  }
-  
-  /* === Map Container === */
-  #map-container {
-    margin: 1.5rem 0;
-    padding: 1.5rem;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e1e8ed;
-  }
-  
-  #map {
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* === Orders Section === */
-  #orders-list {
-    display: grid;
-    gap: 1.5rem;
-  }
-  
-  /* === Order Cards === */
-  .order-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e1e8ed;
-    transition: all 0.3s ease;
-  }
-  
-  .order-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  }
-  
-  .order-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #f8f9fa;
-  }
-  
-  .order-id {
-    font-weight: bold;
-    color: #2c3e50;
-    font-size: 1.1rem;
-  }
-  
-  .order-status {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .order-status.pending {
-    background: #fff3cd;
-    color: #856404;
-  }
-  
-  .order-status.approved {
-    background: #d4edda;
-    color: #155724;
-  }
-  
-  .order-status.rejected {
-    background: #f8d7da;
-    color: #721c24;
-  }
-  
-  .order-status.completed {
-    background: #d1ecf1;
-    color: #0c5460;
-  }
-  
-  .order-product {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 8px;
-  }
-  
-  .order-product img {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #e1e8ed;
-  }
-  
-  .order-product-info h4 {
-    margin: 0 0 0.5rem 0;
-    color: #2c3e50;
-    font-size: 1.1rem;
-  }
-  
-  .order-product-info p {
-    margin: 0;
-    color: #6c757d;
-    font-size: 0.9rem;
-  }
-  
-  .order-details {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-  
-  .order-detail {
-    display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    align-items: flex-start;
   }
-  
-  .order-detail label {
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+
+  .search-filter {
+    flex-direction: column;
+    align-items: stretch;
   }
-  
-  .order-detail span {
-    color: #6c757d;
-    font-size: 0.95rem;
+
+  .section {
+    margin: 1rem;
+    padding: 1.2rem;
   }
-  
-  /* === Loading and Error States === */
-  .loading {
-    text-align: center;
-    padding: 2rem;
-    color: #666;
-  }
-  
-  .error {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-    border: 1px solid #f5c6cb;
-  }
-  
-  .success {
-    background: #d4edda;
-    color: #155724;
-    padding: 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-    border: 1px solid #c3e6cb;
-  }
-  
-  /* === Links === */
-  a {
-    color: #667eea;
-    text-decoration: none;
-    transition: color 0.3s ease;
-  }
-  
-  a:hover {
-    color: #764ba2;
-    text-decoration: underline;
-  }
-  
-  /* Address Display and Input Styles */
-  .address-display {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 20px;
-  }
-  
-  .address-info h4 {
-      margin: 0 0 10px 0;
-      color: #2c3e50;
-      font-size: 16px;
-  }
-  
-  .address-info p {
-      margin: 5px 0;
-      color: #495057;
-      font-size: 14px;
-  }
-  
-  .address-info strong {
-      color: #2c3e50;
-      font-weight: 600;
-  }
-  
-  .address-fields {
-      background: #ffffff;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      padding: 20px;
-      margin-top: 15px;
-  }
-  
-  .address-fields h4 {
-      margin: 0 0 15px 0;
-      color: #2c3e50;
-      font-size: 16px;
-      border-bottom: 2px solid #3498db;
-      padding-bottom: 8px;
-  }
-  
-  .address-fields .form-group {
-      margin-bottom: 15px;
-  }
-  
-  .address-fields label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 600;
-      color: #2c3e50;
-      font-size: 14px;
-  }
-  
-  .address-fields input,
-  .address-fields textarea {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      font-size: 14px;
-      transition: border-color 0.3s ease;
-  }
-  
-  .address-fields input:focus,
-  .address-fields textarea:focus {
-      outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-  }
-  
-  .address-fields textarea {
-      resize: vertical;
-      min-height: 80px;
-  }
-  
-  .address-fields button {
-      margin-right: 10px;
-      margin-bottom: 10px;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-  }
-  
-  .address-fields .btn-secondary {
-      background-color: #6c757d;
-      color: white;
-  }
-  
-  .address-fields .btn-secondary:hover {
-      background-color: #5a6268;
-  }
-  
-  /* Map Container Enhancements */
-  #map-container {
-      background: #ffffff;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-  }
-  
-  #map-container h3 {
-      margin: 0 0 15px 0;
-      color: #2c3e50;
-      font-size: 18px;
-      border-bottom: 2px solid #3498db;
-      padding-bottom: 8px;
-  }
-  
-  #map {
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  /* Responsive Design for Address Fields */
-  @media (max-width: 768px) {
-      .address-fields {
-          padding: 15px;
-      }
-      
-      .address-fields button {
-          width: 100%;
-          margin-right: 0;
-          margin-bottom: 10px;
-      }
-      
-      .address-info p {
-          font-size: 13px;
-      }
-  }
-  
-  /* Map Search Styles */
-  .map-search-container {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-  }
-  
-  .map-search-input {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      font-size: 14px;
-      transition: border-color 0.3s ease;
-  }
-  
-  .map-search-input:focus {
-      outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-  }
-  
-  .map-search-btn {
-      padding: 10px 20px;
-      background-color: #3498db;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-  }
-  
-  .map-search-btn:hover {
-      background-color: #2980b9;
-  }
-  
-  .profile-section button:hover, .order-history button:hover {
-    background: #e5e7eb;
-  }
-  
-  /* --- Modal Styles --- */
-  .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-  }
-  
-  .modal-backdrop.show {
-    opacity: 1;
-    visibility: visible;
-  }
-  
-  .modal-content {
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    transform: scale(0.95);
-    transition: transform 0.3s ease;
-  }
-  
-  .modal-backdrop.show .modal-content {
-    transform: scale(1);
-  }
-  
-  .modal-header {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .modal-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-  
-  .modal-close {
-    background: none;
-    border: none;
-    font-size: 1.75rem;
-    cursor: pointer;
-    color: #6b7280;
-    line-height: 1;
-  }
-  .modal-close:hover {
-    color: #1f2937;
-  }
-  
-  .modal-body {
-    padding: 1.5rem;
-  }
-  
-  .user-map {
-    width: 100%;
-    height: 350px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-  } 
+}
