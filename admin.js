@@ -49,7 +49,7 @@ if (loginForm) loginForm.onsubmit = async function(e) {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/login`, {
+    const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -80,7 +80,7 @@ if (registerForm) registerForm.onsubmit = async function(e) {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/register`, {
+    const res = await fetch('/api/admin/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password })
