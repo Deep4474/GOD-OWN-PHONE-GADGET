@@ -1,0 +1,74 @@
+[
+  {
+    "_id": "1751262681629",
+    "userId": "1751251164443",
+    "productId": "1",
+    "quantity": 1,
+    "deliveryOption": "Pick",
+    "paymentMethod": "card",
+    "deliveryAddress": {
+      "state": "undefined",
+      "area": "undefined",
+      "street": "undefined",
+      "address": "oll"
+    },
+    "totalAmount": 1199.99,
+    "status": "pending",
+    "createdAt": "2025-06-30T05:51:21.629Z",
+    "adminMessage": ""
+  },
+  {
+    "_id": "1751279465119",
+    "userId": "1751277952716",
+    "productId": "1751263646852",
+    "quantity": 1,
+    "deliveryOption": "Pick",
+    "paymentMethod": "cash",
+    "deliveryAddress": {
+      "state": "undefined",
+      "area": "undefined",
+      "street": "undefined",
+      "address": "No 14 Oke Ayo Tuntun Oki Olodo Ibadan"
+    },
+    "totalAmount": 0,
+    "status": "pending",
+    "createdAt": "2025-06-30T10:31:05.119Z",
+    "adminMessage": ""
+  },
+  {
+    "_id": "1751280821285",
+    "userId": "1751280640682",
+    "productId": "1751263646852",
+    "quantity": 1,
+    "deliveryOption": "Pick",
+    "paymentMethod": "transfer",
+    "deliveryAddress": {
+      "state": "Oyo",
+      "area": "ibadan",
+      "street": "No 14 Oke Ayo Tuntun Oki Olodo Ibadan",
+      "address": "No 14 Oke Ayo Tuntun Oki Olodo Ibadan"
+    },
+    "totalAmount": 0,
+    "status": "pending",
+    "createdAt": "2025-06-30T10:53:41.286Z",
+    "adminMessage": ""
+  },
+  {
+    "_id": "1751282021823",
+    "userId": "1751280577059",
+    "productId": "1751263646852",
+    "quantity": 1,
+    "deliveryOption": "Pick",
+    "paymentMethod": "transfer",
+    "deliveryAddress": {
+      "state": "undefined",
+      "area": "undefined",
+      "street": "undefined",
+      "address": "oo"
+    },
+    "totalAmount": 0,
+    "status": "pending",
+    "createdAt": "2025-06-30T11:13:41.823Z",
+    "adminMessage": ""
+  }
+]

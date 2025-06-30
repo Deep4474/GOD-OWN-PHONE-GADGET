@@ -1,453 +1,244 @@
 const express = require('express');
-const { body, validationResult, query } = require('express-validator');
-const Product = require('../models/Product');
-const { protect, authorize, optionalAuth } = require('../middleware/auth');
-const ErrorResponse = require('../utils/errorResponse');
+const { body, validationResult } = require('express-validator');
+const { products, saveProducts } = require('./productData');
+const { authenticateToken, requireAdmin } = require('./authMiddleware');
 
 const router = express.Router();
 
-// @desc    Get all products
-// @route   GET /api/products
-// @access  Public
-router.get('/', [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
-    query('category').optional().isIn(['phones', 'tablets', 'accessories', 'laptops', 'smartwatches', 'other']),
-    query('brand').optional().isString(),
-    query('minPrice').optional().isFloat({ min: 0 }),
-    query('maxPrice').optional().isFloat({ min: 0 }),
-    query('sort').optional().isIn(['price', '-price', 'name', '-name', 'createdAt', '-createdAt', 'rating', '-rating']),
-    query('search').optional().isString()
-], async (req, res, next) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array()
-            });
-        }
+// Get all products
+router.get('/', (req, res) => {
+  try {
+    const { category, brand, minPrice, maxPrice, search, sort } = req.query;
+    
+    let filteredProducts = [...products];
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
-        const skip = (page - 1) * limit;
-
-        // Build query
-        let query = { isActive: true };
-
-        // Category filter
-        if (req.query.category) {
-            query.category = req.query.category;
-        }
-
-        // Brand filter
-        if (req.query.brand) {
-            query.brand = { $regex: req.query.brand, $options: 'i' };
-        }
-
-        // Price filter
-        if (req.query.minPrice || req.query.maxPrice) {
-            query.price = {};
-            if (req.query.minPrice) query.price.$gte = parseFloat(req.query.minPrice);
-            if (req.query.maxPrice) query.price.$lte = parseFloat(req.query.maxPrice);
-        }
-
-        // Search filter
-        if (req.query.search) {
-            query.$text = { $search: req.query.search };
-        }
-
-        // Build sort object
-        let sort = { createdAt: -1 };
-        if (req.query.sort) {
-            sort = {};
-            sort[req.query.sort.replace('-', '')] = req.query.sort.startsWith('-') ? -1 : 1;
-        }
-
-        // Execute query
-        const products = await Product.find(query)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .populate('reviews.user', 'firstName lastName');
-
-        // Get total count
-        const total = await Product.countDocuments(query);
-
-        // Calculate pagination info
-        const totalPages = Math.ceil(total / limit);
-        const hasNextPage = page < totalPages;
-        const hasPrevPage = page > 1;
-
-        res.status(200).json({
-            success: true,
-            count: products.length,
-            total,
-            pagination: {
-                currentPage: page,
-                totalPages,
-                hasNextPage,
-                hasPrevPage,
-                nextPage: hasNextPage ? page + 1 : null,
-                prevPage: hasPrevPage ? page - 1 : null
-            },
-            data: products
-        });
-    } catch (error) {
-        next(error);
+    // Filter by category
+    if (category) {
+      filteredProducts = filteredProducts.filter(p => 
+        p.category.toLowerCase() === category.toLowerCase()
+      );
     }
+
+    // Filter by brand
+    if (brand) {
+      filteredProducts = filteredProducts.filter(p => 
+        p.brand.toLowerCase() === brand.toLowerCase()
+      );
+    }
+
+    // Filter by price range
+    if (minPrice) {
+      filteredProducts = filteredProducts.filter(p => p.price >= parseFloat(minPrice));
+    }
+    if (maxPrice) {
+      filteredProducts = filteredProducts.filter(p => p.price <= parseFloat(maxPrice));
+    }
+
+    // Search by name or description
+    if (search) {
+      const searchTerm = search.toLowerCase();
+      filteredProducts = filteredProducts.filter(p => 
+        p.name.toLowerCase().includes(searchTerm) ||
+        p.description.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Sort products
+    if (sort) {
+      switch (sort) {
+        case 'price_asc':
+          filteredProducts.sort((a, b) => a.price - b.price);
+          break;
+        case 'price_desc':
+          filteredProducts.sort((a, b) => b.price - a.price);
+          break;
+        case 'rating':
+          filteredProducts.sort((a, b) => b.rating - a.rating);
+          break;
+        case 'newest':
+          filteredProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          break;
+      }
+    }
+
+    res.json({
+      products: filteredProducts,
+      total: filteredProducts.length,
+      categories: [...new Set(products.map(p => p.category))],
+      brands: [...new Set(products.map(p => p.brand))]
+    });
+
+  } catch (error) {
+    console.error('Get products error:', error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
 });
 
-// @desc    Get single product
-// @route   GET /api/products/:id
-// @access  Public
-router.get('/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id)
-            .populate('reviews.user', 'firstName lastName')
-            .populate('relatedProducts', 'name price mainImage category');
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: product
-        });
-    } catch (error) {
-        next(error);
+// Get single product
+router.get('/:id', (req, res) => {
+  try {
+    const product = products.find(p => p._id === req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
     }
+
+    res.json({ product });
+
+  } catch (error) {
+    console.error('Get product error:', error);
+    res.status(500).json({ error: 'Failed to fetch product' });
+  }
 });
 
-// @desc    Create new product
-// @route   POST /api/products
-// @access  Private/Admin
-router.post('/', protect, authorize('admin'), [
-    body('name')
-        .trim()
-        .isLength({ min: 3, max: 100 })
-        .withMessage('Product name must be between 3 and 100 characters'),
-    body('description')
-        .trim()
-        .isLength({ min: 10, max: 2000 })
-        .withMessage('Description must be between 10 and 2000 characters'),
-    body('price')
-        .isFloat({ min: 0 })
-        .withMessage('Price must be a positive number'),
-    body('category')
-        .isIn(['phones', 'tablets', 'accessories', 'laptops', 'smartwatches', 'other'])
-        .withMessage('Invalid category'),
-    body('brand')
-        .trim()
-        .notEmpty()
-        .withMessage('Brand is required'),
-    body('sku')
-        .trim()
-        .notEmpty()
-        .withMessage('SKU is required'),
-    body('stock')
-        .isInt({ min: 0 })
-        .withMessage('Stock must be a non-negative integer')
-], async (req, res, next) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array()
-            });
-        }
+// Get products by category
+router.get('/category/:category', (req, res) => {
+  try {
+    const categoryProducts = products.filter(p => 
+      p.category.toLowerCase() === req.params.category.toLowerCase()
+    );
 
-        // Check if SKU already exists
-        const existingProduct = await Product.findOne({ sku: req.body.sku });
-        if (existingProduct) {
-            return res.status(400).json({
-                success: false,
-                message: 'Product with this SKU already exists'
-            });
-        }
+    res.json({
+      products: categoryProducts,
+      total: categoryProducts.length,
+      category: req.params.category
+    });
 
-        const product = await Product.create(req.body);
-
-        res.status(201).json({
-            success: true,
-            data: product
-        });
-    } catch (error) {
-        next(error);
-    }
+  } catch (error) {
+    console.error('Get category products error:', error);
+    res.status(500).json({ error: 'Failed to fetch category products' });
+  }
 });
 
-// @desc    Update product
-// @route   PUT /api/products/:id
-// @access  Private/Admin
-router.put('/:id', protect, authorize('admin'), [
-    body('name')
-        .optional()
-        .trim()
-        .isLength({ min: 3, max: 100 })
-        .withMessage('Product name must be between 3 and 100 characters'),
-    body('description')
-        .optional()
-        .trim()
-        .isLength({ min: 10, max: 2000 })
-        .withMessage('Description must be between 10 and 2000 characters'),
-    body('price')
-        .optional()
-        .isFloat({ min: 0 })
-        .withMessage('Price must be a positive number'),
-    body('category')
-        .optional()
-        .isIn(['phones', 'tablets', 'accessories', 'laptops', 'smartwatches', 'other'])
-        .withMessage('Invalid category'),
-    body('stock')
-        .optional()
-        .isInt({ min: 0 })
-        .withMessage('Stock must be a non-negative integer')
-], async (req, res, next) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array()
-            });
-        }
+// Get featured products (top rated)
+router.get('/featured/top-rated', (req, res) => {
+  try {
+    const featuredProducts = products
+      .filter(p => p.rating >= 4.5)
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 6);
 
-        let product = await Product.findById(req.params.id);
+    res.json({
+      products: featuredProducts,
+      total: featuredProducts.length
+    });
 
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true
-        });
-
-        res.status(200).json({
-            success: true,
-            data: product
-        });
-    } catch (error) {
-        next(error);
-    }
+  } catch (error) {
+    console.error('Get featured products error:', error);
+    res.status(500).json({ error: 'Failed to fetch featured products' });
+  }
 });
 
-// @desc    Delete product
-// @route   DELETE /api/products/:id
-// @access  Private/Admin
-router.delete('/:id', protect, authorize('admin'), async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id);
+// Get new arrivals
+router.get('/new-arrivals', (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
+    const newArrivals = products
+      .filter(p => new Date(p.createdAt) >= thirtyDaysAgo)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 8);
 
-        // Soft delete - set isActive to false
-        product.isActive = false;
-        await product.save();
+    res.json({
+      products: newArrivals,
+      total: newArrivals.length
+    });
 
-        res.status(200).json({
-            success: true,
-            message: 'Product deleted successfully'
-        });
-    } catch (error) {
-        next(error);
-    }
+  } catch (error) {
+    console.error('Get new arrivals error:', error);
+    res.status(500).json({ error: 'Failed to fetch new arrivals' });
+  }
 });
 
-// @desc    Add product review
-// @route   POST /api/products/:id/reviews
-// @access  Private
-router.post('/:id/reviews', protect, [
-    body('rating')
-        .isInt({ min: 1, max: 5 })
-        .withMessage('Rating must be between 1 and 5'),
-    body('comment')
-        .trim()
-        .isLength({ min: 10, max: 500 })
-        .withMessage('Comment must be between 10 and 500 characters')
-], async (req, res, next) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array()
-            });
-        }
+// Get product categories
+router.get('/categories/list', (req, res) => {
+  try {
+    const categories = [...new Set(products.map(p => p.category))];
+    
+    res.json({
+      categories: categories.map(category => ({
+        name: category,
+        count: products.filter(p => p.category === category).length
+      }))
+    });
 
-        const product = await Product.findById(req.params.id);
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        // Check if user already reviewed this product
-        const existingReview = product.reviews.find(
-            review => review.user.toString() === req.user.id
-        );
-
-        if (existingReview) {
-            return res.status(400).json({
-                success: false,
-                message: 'You have already reviewed this product'
-            });
-        }
-
-        // Add review
-        await product.addReview(req.user.id, req.body.rating, req.body.comment);
-
-        // Populate user info for response
-        await product.populate('reviews.user', 'firstName lastName');
-
-        res.status(200).json({
-            success: true,
-            message: 'Review added successfully',
-            data: product
-        });
-    } catch (error) {
-        next(error);
-    }
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
 });
 
-// @desc    Get featured products
-// @route   GET /api/products/featured
-// @access  Public
-router.get('/featured', async (req, res, next) => {
-    try {
-        const limit = parseInt(req.query.limit) || 8;
-        const products = await Product.getFeaturedProducts(limit);
+// Get product brands
+router.get('/brands/list', (req, res) => {
+  try {
+    const brands = [...new Set(products.map(p => p.brand))];
+    
+    res.json({
+      brands: brands.map(brand => ({
+        name: brand,
+        count: products.filter(p => p.brand === brand).length
+      }))
+    });
 
-        res.status(200).json({
-            success: true,
-            count: products.length,
-            data: products
-        });
-    } catch (error) {
-        next(error);
-    }
+  } catch (error) {
+    console.error('Get brands error:', error);
+    res.status(500).json({ error: 'Failed to fetch brands' });
+  }
 });
 
-// @desc    Get products by category
-// @route   GET /api/products/category/:category
-// @access  Public
-router.get('/category/:category', [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 50 })
-], async (req, res, next) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
-
-        const products = await Product.getProductsByCategory(req.params.category, limit, page);
-
-        res.status(200).json({
-            success: true,
-            count: products.length,
-            data: products
-        });
-    } catch (error) {
-        next(error);
-    }
+// Add new product (admin only)
+router.post('/', authenticateToken, requireAdmin, (req, res) => {
+  const { name, price, description, category, brand, stock, images } = req.body;
+  if (!name || !price || !description || !category || !brand || !stock || !images || !Array.isArray(images)) {
+    return res.status(400).json({ error: 'All product fields are required' });
+  }
+  const newProduct = {
+    _id: Date.now().toString(),
+    name,
+    price: Number(price),
+    description,
+    category,
+    brand,
+    stock: Number(stock),
+    images,
+    createdAt: new Date().toISOString()
+  };
+  products.push(newProduct);
+  saveProducts(products);
+  res.status(201).json({ message: 'Product added successfully', product: newProduct });
 });
 
-// @desc    Search products
-// @route   GET /api/products/search
-// @access  Public
-router.get('/search', [
-    query('q').notEmpty().withMessage('Search query is required'),
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 50 })
-], async (req, res, next) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array()
-            });
-        }
+// Update a product (admin only)
+router.put('/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const productIndex = products.findIndex(p => p._id === id);
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
+  if (productIndex === -1) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
 
-        const products = await Product.searchProducts(req.query.q, limit, page);
+  // Update only the fields that are provided in the request
+  const updatedProduct = { ...products[productIndex], ...req.body };
+  products[productIndex] = updatedProduct;
 
-        res.status(200).json({
-            success: true,
-            count: products.length,
-            data: products
-        });
-    } catch (error) {
-        next(error);
-    }
+  saveProducts(products);
+  res.json({ message: 'Product updated successfully', product: updatedProduct });
 });
 
-// @desc    Get product statistics
-// @route   GET /api/products/stats
-// @access  Private/Admin
-router.get('/stats', protect, authorize('admin'), async (req, res, next) => {
-    try {
-        const stats = await Product.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    totalProducts: { $sum: 1 },
-                    activeProducts: {
-                        $sum: { $cond: ['$isActive', 1, 0] }
-                    },
-                    featuredProducts: {
-                        $sum: { $cond: ['$isFeatured', 1, 0] }
-                    },
-                    averagePrice: { $avg: '$price' },
-                    totalStock: { $sum: '$stock' }
-                }
-            }
-        ]);
+// Delete a product (admin only)
+router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const productIndex = products.findIndex(p => p._id === id);
 
-        const categoryStats = await Product.aggregate([
-            {
-                $group: {
-                    _id: '$category',
-                    count: { $sum: 1 }
-                }
-            },
-            {
-                $sort: { count: -1 }
-            }
-        ]);
+  if (productIndex === -1) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
 
-        res.status(200).json({
-            success: true,
-            data: {
-                overview: stats[0] || {},
-                categories: categoryStats
-            }
-        });
-    } catch (error) {
-        next(error);
-    }
+  products.splice(productIndex, 1); // Mutate the array directly
+
+  saveProducts(products);
+  res.json({ message: 'Product deleted successfully' });
 });
 
 module.exports = router; 

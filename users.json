@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1751280347225",
+    "name": "iphone 15",
+    "email": "ayomideolunuiyi49@gmail.com",
+    "password": "$2a$12$l92msuNyRZsqp5Xni4VzYeRdhPAAz2lE4PWnVisyRvivWyLNK5dbS",
+    "phone": "08083052946",
+    "address": "olodo",
+    "role": "customer",
+    "createdAt": "2025-06-30T10:45:47.225Z",
+    "isVerified": false,
+    "verificationCode": "262158"
+  },
+  {
+    "id": "1751280577059",
+    "name": "iphone 15",
+    "email": "deepword37@gmail.com",
+    "password": "$2a$12$6d8NLDWFhJKd8EDRE63FeOTAMMdZN6/iByVJKzDykkpLxeP1NGiGq",
+    "phone": "08083052946",
+    "address": "oo",
+    "role": "customer",
+    "createdAt": "2025-06-30T10:49:37.060Z",
+    "isVerified": true,
+    "verificationCode": null
+  },
+  {
+    "id": "1751280640682",
+    "name": "Oluniyi Funmilayo Abigeli",
+    "email": "ayomideoluniyi49@gmail.com",
+    "password": "$2a$12$g.6QiHwMkJDtO2JXzKeqD.4kI.Sm9Lpaonka.lWtKodOl.8sfoauy",
+    "phone": "09138154963",
+    "address": "No 14 Oke Ayo Tuntun Oki Olodo Ibadan",
+    "role": "customer",
+    "createdAt": "2025-06-30T10:50:40.682Z",
+    "isVerified": true,
+    "verificationCode": null
+  }
+]

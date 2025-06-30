@@ -1,0 +1,28 @@
+[
+  {
+    "_id": "1751263646852",
+    "name": "iphoe",
+    "price": "86868",
+    "description": "ui",
+    "category": "phone",
+    "brand": "iphine",
+    "stock": "8",
+    "images": [
+      "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcQR59tVNqoObAFrsJQ6isQqDk49hiRKnQ2pCgvA0XfLFY_SQjaDsWmcb-7Ek2qUxoBjOF2ulkaO4LgBT4CznEPmwNZTdEUQVfGD10J4V0w&usqp=CAc"
+    ],
+    "createdAt": "2025-06-30T06:07:26.852Z"
+  },
+  {
+    "_id": "1751282951811",
+    "name": "iphone 13",
+    "price": 5476346,
+    "description": "goof",
+    "category": "phone",
+    "brand": "iphone",
+    "stock": 7,
+    "images": [
+      "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcQQRsxMcfV6caOsTI1S9cbrkD1QZCSbIAEl4KnWsmBKWdSPMYpv8p7XZLgMC5HSUj019ti5QVZCoYxPpx7M5h7a0ONUtoYzgHtj0YEJUpqadrzWKIv8-v6cK6qopQ8LeAsB7-74ypzaVxs&usqp=CAc"
+    ],
+    "createdAt": "2025-06-30T11:29:11.811Z"
+  }
+]

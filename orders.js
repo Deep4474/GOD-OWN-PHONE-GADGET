@@ -1,129 +1,72 @@
 const express = require('express');
 const router = express.Router();
-const Order = require('../models/Order');
-const auth = require('../middleware/auth');
+const { orders, saveOrders } = require('./orderData');
+const { authenticateToken } = require('./authMiddleware');
+const { v4: uuidv4 } = require('uuid');
 
-// Get all orders (admin only)
-router.get('/', auth, async (req, res) => {
-    try {
-        const orders = await Order.find()
-            .populate('user', 'name email')
-            .populate('products.product', 'name price image')
-            .sort({ createdAt: -1 });
-        
-        res.json({
-            success: true,
-            data: orders
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
+// Get all orders (admin)
+router.get('/', (req, res) => {
+  res.json({ orders });
 });
 
-// Get user's orders
-router.get('/my-orders', auth, async (req, res) => {
-    try {
-        const orders = await Order.find({ user: req.user.id })
-            .populate('products.product', 'name price image')
-            .sort({ createdAt: -1 });
-        
-        res.json({
-            success: true,
-            data: orders
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
+// Get orders for the logged-in user
+router.get('/user', authenticateToken, (req, res) => {
+  try {
+    
+    const userOrders = orders.filter(order => order.userId === req.user.userId);
+    res.json({ orders: userOrders });
+  } catch (error) {
+    console.error('Failed to get user orders:', error);
+    res.status(500).json({ error: 'Failed to get user orders' });
+  }
 });
 
-// Get order by ID
-router.get('/:id', auth, async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id)
-            .populate('user', 'name email')
-            .populate('products.product', 'name price image');
-        
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: order
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
+// Get orders for a user
+router.get('/user/:userId', (req, res) => {
+  const userOrders = orders.filter(o => o.userId === req.params.userId);
+  res.json({ orders: userOrders });
 });
 
-// Create new order
-router.post('/', auth, async (req, res) => {
-    try {
-        const { products, shippingAddress, paymentMethod, totalAmount } = req.body;
-        
-        const order = new Order({
-            user: req.user.id,
-            products,
-            shippingAddress,
-            paymentMethod,
-            totalAmount,
-            status: 'pending'
-        });
-        
-        await order.save();
-        
-        res.status(201).json({
-            success: true,
-            data: order
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
+// Create a new order
+router.post('/create', (req, res) => {
+  const { userId, productId, quantity, deliveryOption, paymentMethod, deliveryAddress, totalAmount } = req.body;
+  
+  const requiredFields = { userId, productId, quantity, deliveryOption, paymentMethod, deliveryAddress, totalAmount };
+  const missingFields = Object.entries(requiredFields)
+    .filter(([key, value]) => value === undefined || value === null)
+    .map(([key]) => key);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
+  }
+
+  const newOrder = {
+    _id: Date.now().toString(),
+    userId,
+    productId,
+    quantity,
+    deliveryOption,
+    paymentMethod,
+    deliveryAddress,
+    totalAmount,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    adminMessage: ''
+  };
+  orders.push(newOrder);
+  saveOrders(orders);
+  res.status(201).json({ success: true, order: newOrder });
 });
 
-// Update order status (admin only)
-router.put('/:id/status', auth, async (req, res) => {
-    try {
-        const { status } = req.body;
-        
-        const order = await Order.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true }
-        );
-        
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: order
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
+// Update order status (admin)
+router.put('/:id/update', (req, res) => {
+  const { status, message } = req.body;
+  const order = orders.find(o => o._id === req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (status) order.status = status;
+  if (message) order.adminMessage = message;
+  saveOrders(orders);
+  res.json({ success: true, order });
 });
 
 module.exports = router; 

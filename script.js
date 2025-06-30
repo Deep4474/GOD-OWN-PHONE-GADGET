@@ -1,1312 +1,971 @@
+// ONGOD Gadget Shop JavaScript - Backend Integration
+
 // API Configuration
-const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000/api' 
-    : `${window.location.origin}/api`;
+const API_BASE_URL = window.location.origin;
+const API_ENDPOINTS = {
+  LOGIN: '/api/auth/login',
+  REGISTER: '/api/auth/register',
+  VERIFY: '/api/auth/verify',
+  LOGOUT: '/api/auth/logout',
+  PRODUCTS: '/api/products',
+  ORDERS: '/api/orders',
+  USER_ORDERS: '/api/orders/user',
+  CREATE_ORDER: '/api/orders/create',
+  NOTIFICATIONS: '/api/notifications',
+  MARK_READ: '/api/notifications/:id/read',
+  UNREAD_COUNT: '/api/notifications/unread-count',
+  PROFILE: '/user/profile',
+  UPDATE_PROFILE: '/user/profile/update',
+  LOCATION: '/location',
+  ADDRESS_VERIFY: '/location/verify',
+  ADMIN_LOGIN: '/api/admin/login'
+};
+
 
 // Global state
 let currentUser = null;
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
+let selectedProduct = null;
+let products = [];
+let orders = [];
+let notifications = [];
+let unreadNotifications = 0;
+let authToken = localStorage.getItem('authToken');
 
 // API Helper Functions
-const api = {
-    async request(endpoint, options = {}) {
-        const url = `${API_BASE_URL}${endpoint}`;
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        };
-
-        // Add auth token if available
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        try {
-            const response = await fetch(url, config);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'API request failed');
-            }
-
-            return data;
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    },
-
-    // Auth endpoints
-    auth: {
-        async register(userData) {
-            return await api.request('/auth/register', {
-                method: 'POST',
-                body: JSON.stringify(userData)
-            });
-        },
-
-        async login(credentials) {
-            return await api.request('/auth/login', {
-                method: 'POST',
-                body: JSON.stringify(credentials)
-            });
-        },
-
-        async logout() {
-            return await api.request('/auth/logout', {
-                method: 'POST'
-            });
-        },
-
-        async getCurrentUser() {
-            return await api.request('/auth/me');
-        },
-
-        async updateProfile(profileData) {
-            return await api.request('/auth/update-profile', {
-                method: 'PUT',
-                body: JSON.stringify(profileData)
-            });
-        }
-    },
-
-    // Product endpoints
-    products: {
-        async getAll(params = {}) {
-            const queryString = new URLSearchParams(params).toString();
-            return await api.request(`/products?${queryString}`);
-        },
-
-        async getById(id) {
-            return await api.request(`/products/${id}`);
-        },
-
-        async getFeatured(limit = 8) {
-            return await api.request(`/products/featured?limit=${limit}`);
-        },
-
-        async getByCategory(category, params = {}) {
-            const queryString = new URLSearchParams(params).toString();
-            return await api.request(`/products/category/${category}?${queryString}`);
-        },
-
-        async search(query, params = {}) {
-            const searchParams = { q: query, ...params };
-            const queryString = new URLSearchParams(searchParams).toString();
-            return await api.request(`/products/search?${queryString}`);
-        }
-    }
-};
-
-// DOM Content Loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all functionality
-    initNavigation();
-    initProductFiltering();
-    initContactForm();
-    initNewsletterForm();
-    initBackToTop();
-    initAnimations();
-    initMobileMenu();
-    initSearch();
-    initCart();
-    initTestimonialsSlider();
-    initAuthentication();
-    loadProducts();
-    updateCartDisplay();
-    showMyOrdersModal();
-});
-
-// Authentication functionality
-function initAuthentication() {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-        loadCurrentUser();
-    }
-
-    // Add login/register modals
-    addAuthModals();
-}
-
-function addAuthModals() {
-    // Create login modal
-    const loginModal = document.createElement('div');
-    loginModal.className = 'auth-modal' + (localStorage.getItem('token') ? ' hidden' : '');
-    loginModal.innerHTML = `
-        <div class="auth-modal-content">
-            <div class="auth-modal-header">
-                <h3>Login</h3>
-                <button class="close-auth-modal">&times;</button>
-            </div>
-            <form id="loginForm" class="auth-form">
-                <div class="form-group">
-                    <label for="loginEmail">Email</label>
-                    <input type="email" id="loginEmail" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">Password</label>
-                    <input type="password" id="loginPassword" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Login</button>
-                <p class="auth-switch">Don't have an account? <a href="#" class="switch-to-register">Register</a></p>
-            </form>
-        </div>
-    `;
-
-    // Create register modal
-    const registerModal = document.createElement('div');
-    registerModal.className = 'auth-modal hidden';
-    registerModal.innerHTML = `
-        <div class="auth-modal-content">
-            <div class="auth-modal-header">
-                <h3>Register</h3>
-                <button class="close-auth-modal">&times;</button>
-            </div>
-            <form id="registerForm" class="auth-form">
-                <div class="form-group">
-                    <label for="registerFirstName">First Name</label>
-                    <input type="text" id="registerFirstName" name="firstName" required>
-                </div>
-                <div class="form-group">
-                    <label for="registerLastName">Last Name</label>
-                    <input type="text" id="registerLastName" name="lastName" required>
-                </div>
-                <div class="form-group">
-                    <label for="registerEmail">Email</label>
-                    <input type="email" id="registerEmail" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="registerPassword">Password</label>
-                    <input type="password" id="registerPassword" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Register</button>
-                <p class="auth-switch">Already have an account? <a href="#" class="switch-to-login">Login</a></p>
-            </form>
-        </div>
-    `;
-
-    document.body.appendChild(loginModal);
-    document.body.appendChild(registerModal);
-
-    // Add auth styles
-    const authStyles = document.createElement('style');
-    authStyles.textContent = `
-        .auth-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            animation: fadeIn 0.3s ease;
-        }
-        .auth-modal.hidden {
-            display: none;
-        }
-        .auth-modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 400px;
-            animation: slideIn 0.3s ease;
-        }
-        .auth-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-        .close-auth-modal {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #666;
-        }
-        .auth-form .form-group {
-            margin-bottom: 1rem;
-        }
-        .auth-form label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-        .auth-form input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .auth-form button {
-            width: 100%;
-            margin-top: 1rem;
-        }
-        .auth-switch {
-            text-align: center;
-            margin-top: 1rem;
-        }
-        .auth-switch a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    `;
-    document.head.appendChild(authStyles);
-
-    // Event listeners
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('close-auth-modal')) {
-            hideAllAuthModals();
-        }
-        if (e.target.classList.contains('switch-to-register')) {
-            e.preventDefault();
-            showRegisterModal();
-        }
-        if (e.target.classList.contains('switch-to-login')) {
-            e.preventDefault();
-            showLoginModal();
-        }
-    });
-
-    // Form submissions
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('registerForm').addEventListener('submit', handleRegister);
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const credentials = {
-        email: formData.get('email'),
-        password: formData.get('password')
-    };
-
-    try {
-        const response = await api.auth.login(credentials);
-        localStorage.setItem('token', response.token);
-        currentUser = response.user;
-        hideAllAuthModals();
-        updateAuthDisplay();
-        showNotification('Login successful!', 'success');
-    } catch (error) {
-        showNotification(error.message, 'error');
-    }
-}
-
-async function handleRegister(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const userData = {
-        firstName: formData.get('firstName'),
-        lastName: formData.get('lastName'),
-        email: formData.get('email'),
-        password: formData.get('password')
-    };
-
-    try {
-        const response = await api.auth.register(userData);
-        showNotification('Registration successful! Please check your email to verify your account.', 'success');
-        showLoginModal();
-    } catch (error) {
-        showNotification(error.message, 'error');
-    }
-}
-
-async function loadCurrentUser() {
-    try {
-        const response = await api.auth.getCurrentUser();
-        currentUser = response.user;
-        updateAuthDisplay();
-    } catch (error) {
-        localStorage.removeItem('token');
-        currentUser = null;
-    }
-}
-
-function updateAuthDisplay() {
-    const authModals = document.querySelectorAll('.auth-modal');
-    if (currentUser) {
-        authModals.forEach(modal => modal.classList.add('hidden'));
-        // Update navigation to show user info
-        const navActions = document.querySelector('.nav-actions');
-        if (navActions) {
-            const userInfo = document.createElement('div');
-            userInfo.className = 'user-info';
-            userInfo.innerHTML = `
-                <span>Welcome, ${currentUser.firstName}</span>
-                <button class="logout-btn">Logout</button>
-            `;
-            navActions.appendChild(userInfo);
-        }
-    }
-}
-
-function showLoginModal() {
-    document.querySelectorAll('.auth-modal').forEach(modal => modal.classList.add('hidden'));
-    document.querySelector('.auth-modal').classList.remove('hidden');
-}
-
-function showRegisterModal() {
-    document.querySelectorAll('.auth-modal').forEach(modal => modal.classList.add('hidden'));
-    document.querySelectorAll('.auth-modal')[1].classList.remove('hidden');
-}
-
-function hideAllAuthModals() {
-    document.querySelectorAll('.auth-modal').forEach(modal => modal.classList.add('hidden'));
-}
-
-// Product loading functionality
-async function loadProducts() {
-    try {
-        const response = await api.products.getFeatured();
-        displayProducts(response.data);
-    } catch (error) {
-        console.error('Error loading products:', error);
-        showNotification('Error loading products', 'error');
-    }
-}
-
-function displayProducts(products) {
-    const productsGrid = document.querySelector('.products-grid');
-    if (!productsGrid) return;
-
-    productsGrid.innerHTML = products.map(product => `
-        <article class="product-card" data-category="${product.category}">
-            <div class="product-image">
-                <img src="${product.mainImage?.url || 'public/product1.jpg'}" alt="${product.name}" loading="lazy">
-                <div class="product-overlay">
-                    <button class="quick-view-btn" data-product-id="${product._id}">Quick View</button>
-                </div>
-            </div>
-            <div class="product-info">
-                <h3>${product.name}</h3>
-                <p class="product-description">${product.shortDescription || product.description}</p>
-                <div class="product-price">
-                    <span class="current-price">$${product.price}</span>
-                    ${product.originalPrice ? `<span class="original-price">$${product.originalPrice}</span>` : ''}
-                </div>
-                <button class="add-to-cart-btn" data-product-id="${product._id}" data-product-name="${product.name}" data-product-price="${product.price}">
-                    Add to Cart
-                </button>
-            </div>
-        </article>
-    `).join('');
-
-    // Add event listeners to new buttons
-    addProductEventListeners();
-}
-
-function addProductEventListeners() {
-    // Add to cart buttons
-    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const productId = this.dataset.productId;
-            const productName = this.dataset.productName;
-            const productPrice = parseFloat(this.dataset.productPrice);
-            
-            addToCart(productId, productName, productPrice);
-        });
-    });
-
-    // Quick view buttons
-    document.querySelectorAll('.quick-view-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const productId = this.dataset.productId;
-            showProductQuickView(productId);
-        });
-    });
-}
-
-async function showProductQuickView(productId) {
-    try {
-        const response = await api.products.getById(productId);
-        const product = response.data;
-        
-        // Create quick view modal
-        const modal = document.createElement('div');
-        modal.className = 'quick-view-modal';
-        modal.innerHTML = `
-            <div class="quick-view-content">
-                <div class="quick-view-header">
-                    <h3>${product.name}</h3>
-                    <button class="close-quick-view">&times;</button>
-                </div>
-                <div class="quick-view-body">
-                    <div class="quick-view-image">
-                        <img src="${product.mainImage?.url || 'public/product1.jpg'}" alt="${product.name}">
-                    </div>
-                    <div class="quick-view-details">
-                        <p class="quick-view-description">${product.description}</p>
-                        <div class="quick-view-price">
-                            <span class="current-price">$${product.price}</span>
-                            ${product.originalPrice ? `<span class="original-price">$${product.originalPrice}</span>` : ''}
-                        </div>
-                        <div class="quick-view-stock">
-                            <span class="stock-status ${product.stockStatus}">${product.stockStatus.replace('-', ' ')}</span>
-                        </div>
-                        <button class="add-to-cart-btn" data-product-id="${product._id}" data-product-name="${product.name}" data-product-price="${product.price}">
-                            Add to Cart
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Add styles
-        const styles = document.createElement('style');
-        styles.textContent = `
-            .quick-view-modal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 2000;
-            }
-            .quick-view-content {
-                background: white;
-                border-radius: 10px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 90%;
-                overflow-y: auto;
-            }
-            .quick-view-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 1rem;
-                border-bottom: 1px solid #eee;
-            }
-            .close-quick-view {
-                background: none;
-                border: none;
-                font-size: 1.5rem;
-                cursor: pointer;
-            }
-            .quick-view-body {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 2rem;
-                padding: 1rem;
-            }
-            .quick-view-image img {
-                width: 100%;
-                height: auto;
-                border-radius: 5px;
-            }
-            .stock-status {
-                padding: 0.25rem 0.5rem;
-                border-radius: 3px;
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-            .stock-status.in.stock {
-                background: #dcfce7;
-                color: #166534;
-            }
-            .stock-status.low.stock {
-                background: #fef3c7;
-                color: #92400e;
-            }
-            .stock-status.out.of.stock {
-                background: #fee2e2;
-                color: #991b1b;
-            }
-            @media (max-width: 768px) {
-                .quick-view-body {
-                    grid-template-columns: 1fr;
-                }
-            }
-        `;
-        document.head.appendChild(styles);
-        
-        // Event listeners
-        modal.querySelector('.close-quick-view').addEventListener('click', () => {
-            document.body.removeChild(modal);
-            document.head.removeChild(styles);
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-                document.head.removeChild(styles);
-            }
-        });
-        
-        // Add to cart from quick view
-        modal.querySelector('.add-to-cart-btn').addEventListener('click', function() {
-            const productId = this.dataset.productId;
-            const productName = this.dataset.productName;
-            const productPrice = parseFloat(this.dataset.productPrice);
-            
-            addToCart(productId, productName, productPrice);
-            document.body.removeChild(modal);
-            document.head.removeChild(styles);
-        });
-        
-    } catch (error) {
-        console.error('Error loading product details:', error);
-        showNotification('Error loading product details', 'error');
-    }
-}
-
-// Cart functionality
-function addToCart(productId, productName, productPrice) {
-    const existingItem = cart.find(item => item.id === productId);
+class API {
+  static async request(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
     
-    if (existingItem) {
-        existingItem.quantity += 1;
+    const defaultOptions = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+      }
+    };
+    
+    const config = {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
+        ...options.headers
+      }
+    };
+    
+    try {
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        let message = `HTTP error! status: ${response.status}`;
+        if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+          message = errorData.errors.map(e => e.msg).join(', ');
+        } else if (errorData.error) {
+          message = errorData.error;
+        } else if (errorData.message) {
+          message = errorData.message;
+        }
+        
+        const error = new Error(message);
+        error.data = errorData;
+        throw error;
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+  
+  static get(endpoint) {
+    return this.request(endpoint);
+  }
+  
+  static post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+  
+  static put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+  
+  static delete(endpoint) {
+    return this.request(endpoint, {
+      method: 'DELETE'
+    });
+  }
+}
+
+// Authentication Functions
+async function loginUser() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) {
+    showMessage('Please enter email and password', 'error');
+    return;
+  }
+
+  try {
+    showLoading('Logging in...');
+    
+    const response = await API.post(API_ENDPOINTS.LOGIN, { email, password });
+    
+    if (response.user && response.token) {
+      authToken = response.token;
+      currentUser = response.user;
+      
+      if (!currentUser.isVerified) {
+        showMessage('Please verify your email before accessing the shop.', 'warning');
+        document.getElementById('verify-email').value = currentUser.email;
+        showVerify();
+        return;
+      }
+      
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(currentUser));
+      
+      showMessage('Login successful! Welcome back.', 'success');
+      showProducts();
+      updateUserInfo();
+      
+      await Promise.all([
+        loadProducts(),
+        loadUserOrders(),
+        loadNotifications(),
+        startNotificationPolling()
+      ]);
     } else {
-        cart.push({
-            id: productId,
-            name: productName,
-            price: productPrice,
-            quantity: 1
-        });
+      showMessage(response.message || 'Login failed', 'error');
     }
-    
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay();
-    showNotification('Product added to cart!', 'success');
+  } catch (error) {
+    showMessage(error.message || 'Login failed. Please try again.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-function updateCartDisplay() {
-    const cartCount = document.querySelector('.cart-count');
-    if (cartCount) {
-        const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-        cartCount.textContent = totalItems;
+async function registerUser() {
+  const formData = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value,
+    phone: document.getElementById('phone').value.trim(),
+    address: document.getElementById('address').value.trim()
+  };
+
+  if (!Object.values(formData).every(value => value)) {
+    showMessage('Please fill in all fields', 'error');
+    return;
+  }
+
+  if (formData.password.length < 6) {
+    showMessage('Password must be at least 6 characters long', 'error');
+    return;
+  }
+
+  try {
+    showLoading('Creating account...');
+    const response = await API.post(API_ENDPOINTS.REGISTER, formData);
+    // Success if user and token are present
+    if (response.user && response.token) {
+      showMessage('Registration successful! Please check your email for verification.', 'success');
+      document.getElementById('verify-email').value = formData.email;
+      showVerify();
+    } else {
+      // Handle unexpected response
+      showMessage(response.message || 'Registration failed', 'error');
     }
+  } catch (error) {
+    showMessage(error.message || 'Registration failed. Please try again.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-// Navigation functionality
-function initNavigation() {
-    const header = document.querySelector('.header');
-    const navLinks = document.querySelectorAll('.nav-link');
-    
-    // Smooth scrolling for navigation links
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            const targetSection = document.querySelector(targetId);
-            
-            if (targetSection) {
-                const headerHeight = header.offsetHeight;
-                const targetPosition = targetSection.offsetTop - headerHeight;
-                
-                window.scrollTo({
-                    top: targetPosition,
-                    behavior: 'smooth'
-                });
-            }
-        });
-    });
-    
-    // Header scroll effect
-    window.addEventListener('scroll', function() {
-        if (window.scrollY > 100) {
-            header.style.background = 'rgba(255, 255, 255, 0.98)';
-            header.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.1)';
-        } else {
-            header.style.background = 'rgba(255, 255, 255, 0.95)';
-            header.style.boxShadow = 'none';
-        }
-    });
-}
+async function verifyEmail() {
+  const email = document.getElementById('verify-email').value.trim();
+  const code = document.getElementById('verification-code').value.trim();
 
-// Mobile menu functionality
-function initMobileMenu() {
-    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
-    const navMenu = document.querySelector('.nav-menu');
+  if (!email || !code) {
+    showMessage('Please enter email and verification code', 'error');
+    return;
+  }
+
+  try {
+    showLoading('Verifying email...');
     
-    if (mobileMenuBtn && navMenu) {
-        mobileMenuBtn.addEventListener('click', function() {
-            navMenu.classList.toggle('active');
-            this.classList.toggle('active');
-            
-            // Animate hamburger menu
-            const spans = this.querySelectorAll('span');
-            spans.forEach((span, index) => {
-                if (this.classList.contains('active')) {
-                    if (index === 0) span.style.transform = 'rotate(45deg) translate(5px, 5px)';
-                    if (index === 1) span.style.opacity = '0';
-                    if (index === 2) span.style.transform = 'rotate(-45deg) translate(7px, -6px)';
-                } else {
-                    span.style.transform = 'none';
-                    span.style.opacity = '1';
-                }
-            });
-        });
-        
-        // Close menu when clicking on a link
-        const navLinks = document.querySelectorAll('.nav-link');
-        navLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                navMenu.classList.remove('active');
-                mobileMenuBtn.classList.remove('active');
-                const spans = mobileMenuBtn.querySelectorAll('span');
-                spans.forEach(span => {
-                    span.style.transform = 'none';
-                    span.style.opacity = '1';
-                });
-            });
-        });
+    const response = await API.post(API_ENDPOINTS.VERIFY, { email, code });
+    
+    if (response.success) {
+      authToken = response.token;
+      currentUser = response.user;
+      
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(currentUser));
+      
+      showMessage('Email verified successfully! Welcome to ONGOD Gadget Shop.', 'success');
+      showProducts();
+      updateUserInfo();
+      
+      await Promise.all([
+        loadProducts(),
+        loadUserOrders(),
+        loadNotifications(),
+        startNotificationPolling()
+      ]);
+    } else {
+      showMessage(response.message || 'Verification failed', 'error');
     }
+  } catch (error) {
+    showMessage(error.message || 'Verification failed. Please try again.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-// Product filtering functionality
-function initProductFiltering() {
-    const categoryBtns = document.querySelectorAll('.category-btn');
-    
-    categoryBtns.forEach(btn => {
-        btn.addEventListener('click', async function() {
-            const category = this.getAttribute('data-category');
-            
-            // Update active button
-            categoryBtns.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            
-            try {
-                let response;
-                if (category === 'all') {
-                    response = await api.products.getAll();
-                } else {
-                    response = await api.products.getByCategory(category);
-                }
-                
-                displayProducts(response.data);
-            } catch (error) {
-                console.error('Error filtering products:', error);
-                showNotification('Error loading products', 'error');
-            }
-        });
-    });
+async function logoutUser() {
+  try {
+    await API.post(API_ENDPOINTS.LOGOUT);
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+  
+  currentUser = null;
+  authToken = null;
+  products = [];
+  orders = [];
+  notifications = [];
+  unreadNotifications = 0;
+  
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('userData');
+  
+  stopNotificationPolling();
+  
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  
+  showLogin();
+  updateUserInfo();
+  showMessage('Logged out successfully', 'success');
 }
 
-// Contact form functionality
-function initContactForm() {
-    const contactForm = document.getElementById('contactForm');
-    
-    if (contactForm) {
-        contactForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Get form data
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-            
-            // Basic validation
-            if (!validateForm(data)) {
-                return;
-            }
-            
-            // Show loading state
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Sending...';
-            submitBtn.disabled = true;
-            
-            // Simulate form submission (replace with actual API call)
-            setTimeout(() => {
-                showNotification('Message sent successfully! We\'ll get back to you soon.', 'success');
-                this.reset();
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            }, 2000);
-        });
-    }
+// Product Functions
+async function loadProducts() {
+  try {
+    const response = await API.get(API_ENDPOINTS.PRODUCTS);
+    products = response.products || [];
+    displayProducts();
+  } catch (error) {
+    console.error('Failed to load products:', error);
+    showMessage('Failed to load products', 'error');
+  }
 }
 
-// Newsletter form functionality
-function initNewsletterForm() {
-    const newsletterForm = document.querySelector('.newsletter-form');
-    
-    if (newsletterForm) {
-        newsletterForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const email = this.querySelector('input[type="email"]').value;
-            
-            if (!isValidEmail(email)) {
-                showNotification('Please enter a valid email address.', 'error');
-                return;
-            }
-            
-            // Show loading state
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Subscribing...';
-            submitBtn.disabled = true;
-            
-            // Simulate subscription
-            setTimeout(() => {
-                showNotification('Successfully subscribed to our newsletter!', 'success');
-                this.reset();
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            }, 1500);
-        });
-    }
-}
+function displayProducts() {
+  const productList = document.getElementById('product-list');
+  if (!productList) return;
 
-// Back to top functionality
-function initBackToTop() {
-    const backToTopBtn = document.querySelector('.back-to-top');
-    
-    if (backToTopBtn) {
-        window.addEventListener('scroll', function() {
-            if (window.scrollY > 300) {
-                backToTopBtn.classList.add('show');
-            } else {
-                backToTopBtn.classList.remove('show');
-            }
-        });
-        
-        backToTopBtn.addEventListener('click', function() {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        });
-    }
-}
+  if (products.length === 0) {
+    productList.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No products available</p>';
+    return;
+  }
 
-// Animations functionality
-function initAnimations() {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-    
-    const observer = new IntersectionObserver(function(entries) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('fade-in-up');
-            }
-        });
-    }, observerOptions);
-    
-    // Observe elements for animation
-    const animateElements = document.querySelectorAll('.feature-card, .product-card, .service-card, .testimonial-card');
-    animateElements.forEach(el => {
-        observer.observe(el);
-    });
-}
-
-// Search functionality
-function initSearch() {
-    const searchBtn = document.querySelector('.search-btn');
-    
-    if (searchBtn) {
-        searchBtn.addEventListener('click', async function() {
-            const searchQuery = prompt('Enter search term:');
-            if (searchQuery) {
-                try {
-                    const response = await api.products.search(searchQuery);
-                    displayProducts(response.data);
-                    showNotification(`Found ${response.data.length} products for "${searchQuery}"`, 'info');
-                } catch (error) {
-                    console.error('Search error:', error);
-                    showNotification('Error performing search', 'error');
-                }
-            }
-        });
-    }
-}
-
-// Cart functionality
-function initCart() {
-    const cartBtn = document.querySelector('.cart-btn');
-    
-    if (cartBtn) {
-        cartBtn.addEventListener('click', function() {
-            if (cart.length > 0) {
-                showCartModal();
-            } else {
-                showNotification('Your cart is empty', 'info');
-            }
-        });
-    }
-}
-
-function showCartModal() {
-    const modal = document.createElement('div');
-    modal.className = 'cart-modal';
-    
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    modal.innerHTML = `
-        <div class="cart-modal-content">
-            <div class="cart-modal-header">
-                <h3>Shopping Cart</h3>
-                <button class="close-cart-modal">&times;</button>
-            </div>
-            <div class="cart-items">
-                ${cart.map(item => `
-                    <div class="cart-item">
-                        <div class="cart-item-info">
-                            <h4>${item.name}</h4>
-                            <p>$${item.price} x ${item.quantity}</p>
-                        </div>
-                        <div class="cart-item-actions">
-                            <button class="update-quantity" data-id="${item.id}" data-action="decrease">-</button>
-                            <span>${item.quantity}</span>
-                            <button class="update-quantity" data-id="${item.id}" data-action="increase">+</button>
-                            <button class="remove-item" data-id="${item.id}">&times;</button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="cart-total">
-                <h4>Total: $${total.toFixed(2)}</h4>
-            </div>
-            <div class="cart-actions">
-                <button class="btn btn-secondary clear-cart">Clear Cart</button>
-            </div>
-            <div class="checkout-section">
-                <h3>Checkout</h3>
-                <label>
-                    <input type="radio" name="checkoutMethod" value="pickup" checked> Pick Up
-                </label>
-                <label>
-                    <input type="radio" name="checkoutMethod" value="delivery"> Delivery
-                </label>
-                <div id="deliveryAddressGroup" style="display:none;">
-                    <input type="text" id="deliveryAddress" placeholder="Enter delivery address">
-                </div>
-                <button id="checkoutBtn" class="btn btn-primary">Checkout</button>
-            </div>
-        </div>
+  productList.innerHTML = products.map(product => {
+    const imgUrl = (product.images && product.images.length) ? product.images[0] : 'https://via.placeholder.com/220x160/ccc/666?text=No+Image';
+    return `
+      <div class="product-card" data-id="${product._id}">
+        <img src="${imgUrl}" alt="${product.name}">
+        <h4>${product.name}</h4>
+        <p class="description">${product.description}</p>
+        <p class="category">${product.category}</p>
+        <p class="price">₦${product.price.toLocaleString()}</p>
+        <button class="buy-now-btn" data-product-id="${product._id}">Buy Now</button>
+      </div>
     `;
-    
-    document.body.appendChild(modal);
-    
-    // Add styles
-    const styles = document.createElement('style');
-    styles.textContent = `
-        .cart-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-        .cart-modal-content {
-            background: white;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90%;
-            overflow-y: auto;
-        }
-        .cart-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-        }
-        .close-cart-modal {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-        .cart-items {
-            padding: 1rem;
-        }
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #eee;
-        }
-        .cart-item-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .update-quantity, .remove-item {
-            background: none;
-            border: 1px solid #ddd;
-            padding: 0.25rem 0.5rem;
-            cursor: pointer;
-            border-radius: 3px;
-        }
-        .cart-total {
-            padding: 1rem;
-            border-top: 1px solid #eee;
-        }
-        .cart-actions {
-            padding: 1rem;
-            display: flex;
-            gap: 1rem;
-        }
+  }).join('');
+}
+
+function filterProducts() {
+  const searchInput = document.getElementById('search-input').value.toLowerCase();
+  const categoryFilter = document.getElementById('category-filter').value;
+
+  const filteredProducts = products.filter(product => {
+    const nameMatch = product.name.toLowerCase().includes(searchInput);
+    const categoryMatch = categoryFilter === '' || product.category === categoryFilter;
+    return nameMatch && categoryMatch;
+  });
+
+  const productList = document.getElementById('product-list');
+  if (!productList) return;
+
+  if (filteredProducts.length === 0) {
+    productList.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No products found</p>';
+    return;
+  }
+
+  productList.innerHTML = filteredProducts.map(product => {
+    const imgUrl = (product.images && product.images.length) ? product.images[0] : 'https://via.placeholder.com/220x160/ccc/666?text=No+Image';
+    return `
+      <div class="product-card" data-id="${product._id}">
+        <img src="${imgUrl}" alt="${product.name}">
+        <h4>${product.name}</h4>
+        <p class="description">${product.description}</p>
+        <p class="category">${product.category}</p>
+        <p class="price">₦${product.price.toLocaleString()}</p>
+        <button class="buy-now-btn" data-product-id="${product._id}">Buy Now</button>
+      </div>
     `;
-    document.head.appendChild(styles);
-    
-    // Event listeners
-    modal.querySelector('.close-cart-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-        document.head.removeChild(styles);
-    });
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-            document.head.removeChild(styles);
-        }
-    });
-    
-    // Cart item actions
-    modal.querySelectorAll('.update-quantity').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const itemId = this.dataset.id;
-            const action = this.dataset.action;
-            updateCartItemQuantity(itemId, action);
-            document.body.removeChild(modal);
-            document.head.removeChild(styles);
-            showCartModal(); // Refresh modal
-        });
-    });
-    
-    modal.querySelectorAll('.remove-item').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const itemId = this.dataset.id;
-            removeFromCart(itemId);
-            document.body.removeChild(modal);
-            document.head.removeChild(styles);
-            showCartModal(); // Refresh modal
-        });
-    });
-    
-    modal.querySelector('.clear-cart').addEventListener('click', () => {
-        clearCart();
-        document.body.removeChild(modal);
-        document.head.removeChild(styles);
-    });
-    
-    // Checkout logic inside cart modal
-    modal.querySelectorAll('input[name="checkoutMethod"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            modal.querySelector('#deliveryAddressGroup').style.display =
-                this.value === 'delivery' ? 'block' : 'none';
-        });
-    });
-    modal.querySelector('#checkoutBtn').addEventListener('click', async function() {
-        const method = modal.querySelector('input[name="checkoutMethod"]:checked').value;
-        const address = method === 'delivery' ? modal.querySelector('#deliveryAddress').value : undefined;
-        const cartData = JSON.parse(localStorage.getItem('cart')) || [];
-        if (cartData.length === 0) {
-            showNotification('Your cart is empty.', 'error');
-            return;
-        }
-        if (method === 'delivery' && !address) {
-            showNotification('Please enter a delivery address.', 'error');
-            return;
-        }
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showNotification('You must be logged in to checkout.', 'error');
-            return;
-        }
-        try {
-            const response = await fetch('http://localhost:5000/api/checkout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify({ method, address, cart: cartData })
-            });
-            const data = await response.json();
-            if (data.success) {
-                showNotification(data.message, 'success');
-                localStorage.removeItem('cart');
-                updateCartDisplay();
-                document.body.removeChild(modal);
-                document.head.removeChild(styles);
-            } else {
-                showNotification(data.message, 'error');
-            }
-        } catch (err) {
-            showNotification('Checkout failed. Please try again.', 'error');
-        }
-    });
+  }).join('');
 }
 
-function updateCartItemQuantity(itemId, action) {
-    const item = cart.find(item => item.id === itemId);
-    if (item) {
-        if (action === 'increase') {
-            item.quantity += 1;
-        } else if (action === 'decrease') {
-            item.quantity -= 1;
-            if (item.quantity <= 0) {
-                removeFromCart(itemId);
-                return;
-            }
-        }
-        localStorage.setItem('cart', JSON.stringify(cart));
-        updateCartDisplay();
+function selectProduct(productId) {
+  selectedProduct = products.find(p => p._id === productId);
+  
+  if (!selectedProduct) {
+    showMessage('Product not found', 'error');
+    return;
+  }
+  
+  document.getElementById('selected-product-name').textContent = selectedProduct.name;
+  document.getElementById('selected-product-price').textContent = `₦${selectedProduct.price.toLocaleString()}`;
+  
+  updateTotal();
+  showBuy();
+}
+
+// Order Functions
+async function loadUserOrders() {
+  if (!currentUser) return;
+  
+  try {
+    const response = await API.get(API_ENDPOINTS.USER_ORDERS);
+    orders = response.orders || [];
+  } catch (error) {
+    console.error('Failed to load orders:', error);
+  }
+}
+
+async function placeOrder() {
+  const quantityInput = document.getElementById('quantity');
+  const buyOptionSelect = document.getElementById('buy-option');
+  const paymentMethodSelect = document.getElementById('payment-method');
+
+  if (!selectedProduct || !currentUser || !quantityInput || !buyOptionSelect || !paymentMethodSelect) {
+    showMessage('An error occurred. Please try again.', 'error');
+    console.error('Missing required elements or data for placing an order.');
+    return;
+  }
+
+  const orderData = {
+    userId: currentUser._id,
+    productId: selectedProduct._id,
+    quantity: parseInt(quantityInput.value, 10),
+    deliveryOption: buyOptionSelect.value,
+    paymentMethod: paymentMethodSelect.value,
+    deliveryAddress: currentUser.address,
+    totalAmount: calculateTotal(parseInt(quantityInput.value, 10), buyOptionSelect.value)
+  };
+
+  if (!orderData.deliveryOption || !orderData.paymentMethod) {
+    showMessage('Please select both delivery option and payment method', 'error');
+    return;
+  }
+  
+  try {
+    showLoading('Placing order...');
+    
+    const response = await API.post(API_ENDPOINTS.CREATE_ORDER, orderData);
+    
+    if (response.success) {
+      showMessage('Order placed successfully! Admin will review and update you.', 'success');
+      
+      const order = response.order;
+      let message = `Order Details:\n\n`;
+      message += `Order ID: ${order._id}\n`;
+      message += `Product: ${selectedProduct.name}\n`;
+      message += `Quantity: ${quantityInput.value}\n`;
+      message += `Total: ₦${order.totalAmount.toLocaleString()}\n`;
+      message += `Status: ${order.status}\n`;
+      message += `Date: ${new Date(order.createdAt).toLocaleString()}\n\n`;
+      
+      if (paymentMethodSelect.value === 'transfer') {
+        message += `Please transfer ₦${order.totalAmount.toLocaleString()} to:\n`;
+        message += `Account: ONGOD GADGETS\n`;
+        message += `Account No: 1234567890\n`;
+        message += `Bank: Zenith Bank\n\n`;
+      }
+      
+      message += `You will receive notifications when admin updates your order.`;
+      
+      alert(message);
+      
+      resetBuyForm();
+      await loadUserOrders();
+      showProducts();
+    } else {
+      showMessage(response.message || 'Failed to place order', 'error');
     }
+  } catch (error) {
+    showMessage(error.message || 'Failed to place order. Please try again.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-function removeFromCart(itemId) {
-    cart = cart.filter(item => item.id !== itemId);
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay();
+function calculateTotal(quantity, buyOption) {
+  if (!selectedProduct || !selectedProduct.price) return 0;
+  
+  const basePrice = selectedProduct.price * quantity;
+  let deliveryFee = 0;
+  
+  if (buyOption === 'Delivery') {
+    // Delivery is 5% of base price
+    deliveryFee = basePrice * 0.05; 
+  } else if (buyOption === 'Pick Up') { // Changed from 'Pick'
+    // Pick up is 2% of base price
+    deliveryFee = basePrice * 0.02;
+  }
+  
+  return basePrice + deliveryFee;
 }
 
-function clearCart() {
-    cart = [];
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay();
-    showNotification('Cart cleared', 'success');
+function updateTotal() {
+  if (!selectedProduct) return;
+  const quantity = parseInt(document.getElementById('quantity').value) || 1;
+  const totalPrice = quantity * selectedProduct.price;
+  document.getElementById('total-price').textContent = `₦${totalPrice.toLocaleString()}`;
 }
 
-// Testimonials slider functionality
-function initTestimonialsSlider() {
-    const testimonials = document.querySelectorAll('.testimonial-card');
-    let currentIndex = 0;
+function displayOrders() {
+  const ordersList = document.getElementById('orders-list');
+  if (!ordersList) return;
+  
+  if (orders.length === 0) {
+    ordersList.innerHTML = '<p style="text-align: center;">No orders found</p>';
+    return;
+  }
+  
+  ordersList.innerHTML = orders.map(order => `
+    <div class="order-item">
+      <h4>${order.productName}</h4>
+      <p><strong>Order ID:</strong> ${order._id}</p>
+      <p><strong>Quantity:</strong> ${order.quantity}</p>
+      <p><strong>Total:</strong> ₦${order.totalAmount.toLocaleString()}</p>
+      <p><strong>Status:</strong> <span class="status-${order.status}">${order.status}</span></p>
+      <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+      ${order.adminMessage ? `<p><strong>Admin Message:</strong> ${order.adminMessage}</p>` : ''}
+    </div>
+  `).join('');
+}
+
+// Notification Functions
+let notificationInterval;
+
+async function loadNotifications() {
+  if (!currentUser) return;
+  
+  try {
+    const response = await API.get(API_ENDPOINTS.NOTIFICATIONS);
+    notifications = response.notifications || [];
     
-    if (testimonials.length > 0) {
-        // Auto-rotate testimonials
-        setInterval(() => {
-            testimonials.forEach((testimonial, index) => {
-                testimonial.style.opacity = index === currentIndex ? '1' : '0.5';
-                testimonial.style.transform = index === currentIndex ? 'scale(1)' : 'scale(0.95)';
-            });
-            
-            currentIndex = (currentIndex + 1) % testimonials.length;
-        }, 5000);
+    const unreadResponse = await API.get(API_ENDPOINTS.UNREAD_COUNT);
+    unreadNotifications = unreadResponse.count || 0;
+    
+    updateNotificationBadge();
+  } catch (error) {
+    console.error('Failed to load notifications:', error);
+  }
+}
+
+function updateNotificationBadge() {
+  const notificationBtn = document.getElementById('notification-btn');
+  if (!notificationBtn) return;
+  
+  let badge = notificationBtn.querySelector('.notification-badge');
+  
+  if (unreadNotifications > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'notification-badge';
+      badge.style.cssText = `
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #e74c3c;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+      `;
+      notificationBtn.appendChild(badge);
     }
+    badge.textContent = unreadNotifications;
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+function startNotificationPolling() {
+  stopNotificationPolling(); // Clear any existing interval
+  notificationInterval = setInterval(async () => {
+    if (authToken) {
+      try {
+        await loadNotifications();
+      } catch (error) {
+        console.error('Polling error:', error);
+        // Optional: stop polling if there's a persistent error
+        if (error.data && (error.data.status === 401 || error.data.status === 403)) {
+          stopNotificationPolling();
+        }
+      }
+    }
+  }, 15000); // Poll every 15 seconds
+}
+
+function stopNotificationPolling() {
+  if (notificationInterval) {
+    clearInterval(notificationInterval);
+  }
+}
+
+// Location Functions
+async function getCurrentLocation() {
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+      
+      const location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      
+      const response = await API.post(API_ENDPOINTS.LOCATION, location);
+      
+      if (response.address) {
+        document.getElementById('delivery-state').value = response.address.state || '';
+        document.getElementById('delivery-area').value = response.address.area || '';
+        document.getElementById('delivery-street').value = response.address.street || '';
+        document.getElementById('delivery-address').value = response.address.fullAddress || '';
+        
+        showMessage('Current location obtained successfully', 'success');
+      }
+    } catch (error) {
+      showMessage('Unable to get current location', 'error');
+    }
+  } else {
+    showMessage('Geolocation is not supported by this browser', 'error');
+  }
+}
+
+// UI Functions
+function showLoading(message = 'Loading...') {
+  const loadingDiv = document.getElementById('loading-overlay') || createLoadingOverlay();
+  loadingDiv.querySelector('.loading-message').textContent = message;
+  loadingDiv.style.display = 'flex';
+}
+
+function hideLoading() {
+  const loadingDiv = document.getElementById('loading-overlay');
+  if (loadingDiv) {
+    loadingDiv.style.display = 'none';
+  }
+}
+
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `;
+  
+  overlay.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 8px; text-align: center;">
+      <div class="spinner"></div>
+      <p class="loading-message">Loading...</p>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// Navigation functions
+function showLogin() {
+  hideAllSections();
+  document.getElementById('login-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.add('hidden');
+}
+
+function showRegister() {
+  hideAllSections();
+  document.getElementById('register-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.add('hidden');
+}
+
+function showVerify() {
+  hideAllSections();
+  document.getElementById('verify-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.add('hidden');
+}
+
+function showProducts() {
+  hideAllSections();
+  document.getElementById('products-section').classList.remove('hidden');
+  displayProducts();
+}
+
+async function showOrders() {
+  if (!currentUser) return;
+  hideAllSections();
+  document.getElementById('orders-section').classList.remove('hidden');
+  displayOrders();
+}
+
+function showBuy() {
+  hideAllSections();
+  document.getElementById('buy-section').classList.remove('hidden');
+}
+
+function showMap() {
+  const buyOption = document.getElementById('buy-option').value;
+  const mapContainer = document.getElementById('map-container');
+  if (buyOption === 'Delivery' || buyOption === 'Pick') {
+    mapContainer.classList.remove('hidden');
+    initializeMap();
+  } else {
+    mapContainer.classList.add('hidden');
+  }
+}
+
+function hideAllSections() {
+  document.querySelectorAll('main > section').forEach(section => {
+    section.classList.add('hidden');
+  });
+}
+
+function updateUserInfo() {
+  const userInfo = document.getElementById('user-info');
+  const welcome = document.getElementById('welcome');
+  if (currentUser && userInfo && welcome) {
+    userInfo.classList.remove('hidden');
+    welcome.textContent = `Welcome, ${currentUser.name || currentUser.email}`;
+  } else if (userInfo && welcome) {
+    userInfo.classList.add('hidden');
+    welcome.textContent = '';
+  }
+  updateHeaderActions();
+}
+
+function showUserMapModal(address) {
+  // Simple alert for now, can be replaced by a modal library
+  alert(`Map for address: ${address}`);
+}
+
+function resetBuyForm() {
+  const buyForm = document.getElementById('buy-form');
+  if (buyForm) {
+    buyForm.reset();
+  }
+  // Also manually reset elements that .reset() might not affect
+  document.getElementById('total-price').textContent = '₦0';
+  document.getElementById('map-container').classList.add('hidden');
+  selectedProduct = null;
 }
 
 // Utility functions
-function validateForm(data) {
-    const requiredFields = ['name', 'email', 'subject', 'message'];
-    
-    for (let field of requiredFields) {
-        if (!data[field] || data[field].trim() === '') {
-            showNotification(`Please fill in the ${field} field.`, 'error');
-            return false;
-        }
-    }
-    
-    if (!isValidEmail(data.email)) {
-        showNotification('Please enter a valid email address.', 'error');
-        return false;
-    }
-    
-    return true;
-}
-
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
-
-function showNotification(message, type = 'info') {
-    // Remove existing notifications
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-        document.body.removeChild(notification);
-    });
-    
-    // Create notification
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <span class="notification-message">${message}</span>
-            <button class="notification-close">&times;</button>
-        </div>
-    `;
-    
-    // Add styles
-    const style = document.createElement('style');
-    style.textContent = `
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 3000;
-            animation: slideInRight 0.3s ease;
-            max-width: 400px;
-        }
-        .notification-success { border-left: 4px solid #10b981; }
-        .notification-error { border-left: 4px solid #ef4444; }
-        .notification-info { border-left: 4px solid #3b82f6; }
-        .notification-warning { border-left: 4px solid #f59e0b; }
-        .notification-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem;
-        }
-        .notification-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #666;
-            margin-left: 1rem;
-        }
-        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    `;
-    
-    document.head.appendChild(style);
-    document.body.appendChild(notification);
-    
-    // Auto remove after 5 seconds
+function showMessage(message, type = 'info') {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message message-${type}`;
+  messageDiv.textContent = message;
+  messageDiv.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+  `;
+  
+  switch (type) {
+    case 'success':
+      messageDiv.style.backgroundColor = '#28a745';
+      break;
+    case 'error':
+      messageDiv.style.backgroundColor = '#dc3545';
+      break;
+    case 'warning':
+      messageDiv.style.backgroundColor = '#ffc107';
+      messageDiv.style.color = '#000';
+      break;
+    default:
+      messageDiv.style.backgroundColor = '#17a2b8';
+  }
+  
+  document.body.appendChild(messageDiv);
+  
+  setTimeout(() => {
+    messageDiv.style.animation = 'slideOut 0.3s ease';
     setTimeout(() => {
-        if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-            document.head.removeChild(style);
-        }
-    }, 5000);
-    
-    // Close button functionality
-    const closeBtn = notification.querySelector('.notification-close');
-    closeBtn.addEventListener('click', () => {
-        document.body.removeChild(notification);
-        document.head.removeChild(style);
-    });
+      if (messageDiv.parentNode) {
+        messageDiv.parentNode.removeChild(messageDiv);
+      }
+    }, 300);
+  }, 3000);
 }
 
-// Performance optimization
-window.addEventListener('load', function() {
-    // Lazy load images
-    const images = document.querySelectorAll('img[loading="lazy"]');
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                img.src = img.src; // Trigger load
-                observer.unobserve(img);
-            }
-        });
+function togglePasswordVisibility() {
+  const passwordInput = document.getElementById('login-password');
+  const toggleBtn = document.getElementById('toggle-login-password');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleBtn.textContent = '🙈';
+  } else {
+    passwordInput.type = 'password';
+    toggleBtn.textContent = '👁️';
+  }
+}
+
+// Map and location functions
+function initializeMap() {
+  const mapContainer = document.getElementById('map');
+  const addressDisplay = document.getElementById('current-address');
+
+  if (currentUser && currentUser.address) {
+    const address = currentUser.address;
+    addressDisplay.textContent = address;
+
+    const mapSrc = `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+    mapContainer.innerHTML = `<iframe style="width:100%; height:100%; border:0;" src="${mapSrc}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+  } else {
+    addressDisplay.textContent = 'No address provided with your account.';
+    mapContainer.innerHTML = '<div style="text-align:center; padding: 5rem 1rem; color: #6b7280;">Please provide an address in your profile to see the map.</div>';
+  }
+}
+
+function useRegisteredAddress() {
+  if (!currentUser) {
+    showMessage('Please login first', 'error');
+    return;
+  }
+  
+  document.getElementById('delivery-state').value = currentUser.state;
+  document.getElementById('delivery-area').value = currentUser.area;
+  document.getElementById('delivery-street').value = currentUser.street;
+  document.getElementById('delivery-address').value = currentUser.address;
+  
+  showMessage('Using registered address', 'success');
+}
+
+function searchLocation() {
+  const searchTerm = document.getElementById('map-search').value.trim();
+  
+  if (!searchTerm) {
+    showMessage('Please enter a search term', 'error');
+    return;
+  }
+  
+  showMessage(`Searching for: ${searchTerm}`, 'success');
+}
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', function() {
+  initializeApp();
+  setupEventListeners();
+});
+
+function initializeApp() {
+  checkRegistrationFormElements();
+  const savedUser = localStorage.getItem('userData');
+  const savedToken = localStorage.getItem('authToken');
+  
+  if (savedUser && savedToken) {
+    currentUser = JSON.parse(savedUser);
+    authToken = savedToken;
+    showProducts();
+    updateUserInfo();
+    
+    Promise.all([
+      loadProducts(),
+      loadUserOrders(),
+      loadNotifications(),
+      startNotificationPolling()
+    ]).catch(console.error);
+  }
+}
+
+function setupEventListeners() {
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      loginUser();
     });
-    
-    images.forEach(img => imageObserver.observe(img));
-    
-    // Handle missing images gracefully
-    document.addEventListener('error', function(e) {
-        if (e.target.tagName === 'IMG') {
-            e.target.style.display = 'none';
-            console.warn('Image failed to load:', e.target.src);
-        }
-    }, true);
-});
+  }
 
-// Error handling
-window.addEventListener('error', function(e) {
-    console.error('JavaScript error:', e.error);
-});
+  const registerBtn = document.getElementById('register-btn');
+  if (registerBtn) {
+    registerBtn.addEventListener('click', registerUser);
+  }
 
-// API error handling for connection issues
-window.addEventListener('unhandledrejection', function(event) {
-    if (event.reason && event.reason.message && event.reason.message.includes('Failed to fetch')) {
-        console.warn('API connection failed - server may not be running');
-        showNotification('Unable to connect to server. Please check if the backend is running.', 'warning');
+  const buyOption = document.getElementById('buy-option');
+  if (buyOption) {
+    buyOption.addEventListener('change', showMap);
+  }
+
+  const quantityInput = document.getElementById('quantity');
+  if (quantityInput) {
+    quantityInput.addEventListener('change', updateTotal);
+  }
+
+  const productList = document.getElementById('product-list');
+  if (productList) {
+    productList.addEventListener('click', (event) => {
+      if (event.target && event.target.classList.contains('buy-now-btn')) {
+        const productId = event.target.dataset.productId;
+        selectProduct(productId);
+      }
+    });
+  }
+
+  const toggleLoginPassword = document.getElementById('toggle-login-password');
+  if(toggleLoginPassword) {
+    toggleLoginPassword.addEventListener('click', togglePasswordVisibility);
+  }
+
+  document.getElementById('show-register-link')?.addEventListener('click', showRegister);
+  document.getElementById('show-login-link')?.addEventListener('click', showLogin);
+  document.getElementById('show-login-link-2')?.addEventListener('click', showLogin);
+  
+  document.getElementById('verify-btn')?.addEventListener('click', verifyEmail);
+  
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      if (currentUser) {
+        logoutUser();
+      } else {
+        showMessage('You are not logged in.', 'error');
+      }
+    });
+  }
+
+  const ordersBtn = document.getElementById('orders-btn');
+  if (ordersBtn) {
+    ordersBtn.addEventListener('click', () => {
+      if (currentUser) {
+        showOrders();
+      } else {
+        showMessage('Please log in to view your orders.', 'error');
+      }
+    });
+  }
+  
+  document.getElementById('back-to-products-btn')?.addEventListener('click', showProducts);
+  
+  document.getElementById('search-input')?.addEventListener('input', filterProducts);
+  document.getElementById('category-filter')?.addEventListener('change', filterProducts);
+  
+  document.getElementById('use-current-location-btn')?.addEventListener('click', getCurrentLocation);
+  document.getElementById('use-registered-address-btn')?.addEventListener('click', useRegisteredAddress);
+  document.getElementById('search-location-btn')?.addEventListener('click', searchLocation);
+  
+  document.getElementById('place-order-btn')?.addEventListener('click', placeOrder);
+}
+
+// Add CSS animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+  
+  .status-pending { color: #ffc107; font-weight: bold; }
+  .status-confirmed { color: #28a745; font-weight: bold; }
+  .status-rejected { color: #dc3545; font-weight: bold; }
+  .status-delivered { color: #17a2b8; font-weight: bold; }
+  .status-processing { color: #fd7e14; font-weight: bold; }
+  
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);
+
+function checkRegistrationFormElements() {
+  const requiredIds = ['name', 'email', 'password', 'phone', 'address', 'register-btn'];
+  let allPresent = true;
+  requiredIds.forEach(id => {
+    if (!document.getElementById(id)) {
+      console.warn(`Warning: Registration form element with id '${id}' is missing from the HTML.`);
+      allPresent = false;
     }
-});
-
-// === User: View My Orders ===
-function showMyOrdersModal() {
-    const modal = document.createElement('div');
-    modal.className = 'my-orders-modal';
-    modal.innerHTML = `
-        <div class="my-orders-content">
-            <div class="my-orders-header">
-                <h3>My Orders</h3>
-                <button class="close-my-orders">&times;</button>
-            </div>
-            <div class="my-orders-list">Loading orders...</div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    const styles = document.createElement('style');
-    styles.textContent = `
-        .my-orders-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 3000; }
-        .my-orders-content { background: #fff; border-radius: 10px; width: 95%; max-width: 700px; max-height: 90%; overflow-y: auto; padding: 1.5rem; }
-        .my-orders-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; margin-bottom: 1rem; }
-        .close-my-orders { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
-        .my-orders-list { margin-top: 1rem; }
-        .my-order { border: 1px solid #e5e7eb; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: #f9fafb; }
-        .my-order .order-status { font-weight: 600; }
-    `;
-    document.head.appendChild(styles);
-    // Close modal
-    modal.querySelector('.close-my-orders').addEventListener('click', () => {
-        document.body.removeChild(modal);
-        document.head.removeChild(styles);
-    });
-    // Fetch and render orders
-    fetch('http://localhost:5000/api/my-orders')
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success) {
-                modal.querySelector('.my-orders-list').innerHTML = '<p>Failed to load orders.</p>';
-                return;
-            }
-            if (data.orders.length === 0) {
-                modal.querySelector('.my-orders-list').innerHTML = '<p>No orders found.</p>';
-                return;
-            }
-            modal.querySelector('.my-orders-list').innerHTML = data.orders.map(order => `
-                <div class="my-order">
-                    <div><b>Order ID:</b> ${order.id}</div>
-                    <div><b>Method:</b> ${order.method}</div>
-                    <div><b>Address:</b> ${order.address || '-'}</div>
-                    <div><b>Status:</b> <span class="order-status">${order.status}</span></div>
-                    <div><b>Created:</b> ${new Date(order.createdAt).toLocaleString()}</div>
-                    <div><b>Cart:</b> ${order.cart.map(item => `${item.name} x${item.quantity}`).join(', ')}</div>
-                    ${order.adminMessage ? `<div><b>Admin Message:</b> <span style='color:#2563eb'>${order.adminMessage}</span></div>` : ''}
-                </div>
-            `).join('');
-        });
+  });
+  if (allPresent) {
+    console.log('All registration form elements are present.');
+  }
 }
-// Add a button for demo
-if (!document.getElementById('myOrdersBtn')) {
-    document.addEventListener('DOMContentLoaded', function() {
-        const myOrdersBtn = document.createElement('button');
-        myOrdersBtn.textContent = 'View My Orders';
-        myOrdersBtn.id = 'myOrdersBtn';
-        myOrdersBtn.className = 'btn btn-primary';
-        myOrdersBtn.style.position = 'fixed';
-        myOrdersBtn.style.bottom = '30px';
-        myOrdersBtn.style.left = '30px';
-        myOrdersBtn.style.zIndex = 4000;
-        myOrdersBtn.onclick = showMyOrdersModal;
-        document.body.appendChild(myOrdersBtn);
-    });
-} 
+
+function updateHeaderActions() {
+  const logoutBtn = document.getElementById('logout-btn');
+  const ordersBtn = document.getElementById('orders-btn');
+  if (!logoutBtn || !ordersBtn) return;
+  if (currentUser) {
+    logoutBtn.disabled = false;
+    ordersBtn.disabled = false;
+    logoutBtn.classList.remove('disabled');
+    ordersBtn.classList.remove('disabled');
+  } else {
+    logoutBtn.disabled = true;
+    ordersBtn.disabled = true;
+    logoutBtn.classList.add('disabled');
+    ordersBtn.classList.add('disabled');
+  }
+}
