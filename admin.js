@@ -16,7 +16,7 @@ const ADMIN_USERS_FILE = path.join(__dirname, './admin-users.json');
 
 // A simple test route
 router.get('/test', (req, res) => {
-  res.json({ success: true, message: 'Admin route is working' });
+  res.json({ success: true, message: 'Root admin.js is being used!' });
 });
 
 // Dashboard stats endpoint
