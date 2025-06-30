@@ -15,6 +15,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.options('*', cors());
+
 // Import routes
 const authRoutes = require('./auth_fixed');
 const productRoutes = require('./products');
